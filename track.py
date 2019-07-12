@@ -9,6 +9,7 @@ from kcftracker import KCFTracker
 class Track:
     # DEFAULT
     age = 0     # age < PROBATION means is_candidate
+    color = (128, 128, 128)  # gray
     current_id = 0
     health = 2  # positive means visible
     is_occluded = False
@@ -20,7 +21,7 @@ class Track:
     BIRTH_IOU = .5
     CANDIDATE_IOU = .55
     OCCLUSION_IOU = .4
-    PROBATION = 2
+    PROBATION = 1
     MINIMUM_CONFIDENCE = .6
 
     def __init__(self, frame, init_box, feature=None):
@@ -30,7 +31,6 @@ class Track:
         self.tracker = KCFTracker(False, True, True)
         self.tracker.init(init_box, frame)
         self.id = Track.current_id
-        self.color = (0, 255, 0)        # todo: more colors
         Track.ALL.add(self)
         Track.current_id += 1
 
@@ -121,7 +121,3 @@ def iou(boxes1, boxes2):
     intersection = np.maximum(right - left, 0) * np.maximum(bottom - top, 0)
     union = area1[:, None] + area2[None] - intersection
     return intersection / union
-
-
-if __name__ == '__main__':
-    pass

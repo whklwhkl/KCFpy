@@ -1,4 +1,5 @@
 from track import Track
+from colors import colors
 
 import numpy as np
 import requests
@@ -7,9 +8,9 @@ import cv2
 from io import BytesIO
 
 
-DET_URL = 'http://0.0.0.0:6666/det'
-EXT_URL = 'http://0.0.0.0:6667/ext'
-CMP_URL = 'http://0.0.0.0:6668/{}'
+DET_URL = 'http://192.168.20.122:6666/det'
+EXT_URL = 'http://192.168.20.122:6667/ext'
+CMP_URL = 'http://192.168.20.122:6668/{}'
 
 
 def det(img_file):
@@ -37,12 +38,25 @@ def _nd2file(img_nd):
 
 
 def _cvt_ltrb2ltwh(boxes):
+    boxes = np.array(boxes)
     boxes[:, 2: 4] -= boxes[:, :2]
     return boxes[:, :4]
 
 
+def _crop(frame, trk_box):
+    H, W, _ = frame.shape
+    l, t, w, h = map(int, trk_box)
+    l = max(l, 0)
+    t = max(t, 0)
+    r = min(l + w, W)
+    b = min(t + h, H)
+    crop = frame[t: b, l: r, :]
+    return cv2.resize(crop, (128, 384))
+
+
 if __name__ == '__main__':
-    cap = cv2.VideoCapture('/home/wanghao/Videos/CVPR19-02.mp4')
+    # cap = cv2.VideoCapture('/home/wanghao/Videos/CVPR19-02.mp4')
+    cap = cv2.VideoCapture(0)
     frame_count = 0
     INTEVAL = 24
 
@@ -54,14 +68,17 @@ if __name__ == '__main__':
         Track.step(frame_)
         if frame_count % INTEVAL == 0:
             boxes = det(_nd2file(frame_))
-            boxes = np.array(boxes)
-            boxes = _cvt_ltrb2ltwh(boxes)
-            Track.update(frame_, boxes)
+            if len(boxes):
+                boxes = _cvt_ltrb2ltwh(boxes)
+                Track.update(frame_, boxes)
             for t in Track.ALL:
                 if t.is_valid():
-                    pass
-                    # img_roi = crop(frame, t.box)
-                    # t.feature = ext(_nd2file(img_roi))
+                    t.color = colors[t.id % 256]
+                    img_roi = _crop(frame, t.box)
+                    t.feature = ext(_nd2file(img_roi))
+                    up(t.id, t.feature)
+                    i = query(t.feature)
+                    assert i == t.id
         Track.render(frame)
         cv2.imshow('tracking', frame)
         c = cv2.waitKey(1) & 0xFF

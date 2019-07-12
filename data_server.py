@@ -1,19 +1,19 @@
 from flask import Flask, request, jsonify
-
+import numpy as np
 
 app = Flask('compare')
 
 
 DATASET = {}
 
-@app.route('/update')
+
+@app.route('/update', methods=['POST'])
 def update():
     identity = request.get_json()
-    DATASET.update(identity)
-    return jsonify({'done'})
+    DATASET.update({identity['id']: identity['feature']})
+    return jsonify('done')
 
 
-import numpy as np
 def compare(feature1, feature2):
     f1 = np.array(feature1)
     f2 = np.array(feature2)
@@ -21,13 +21,13 @@ def compare(feature1, feature2):
 
 
 MIN_SIMILARITY = .95
-@app.route('/query')
+@app.route('/query', methods=['POST'])
 def query():
     identity = request.get_json()
     feature = identity['feature']
     similarity_lst = []
     id_lst = []
-    for k,v in DATASET.items():
+    for k, v in DATASET.items():
         similarity_lst += [compare(v, feature)]
         id_lst += [k]
     ret = -1
@@ -39,4 +39,4 @@ def query():
 
 
 if __name__ == '__main__':
-    app.run('0.0.0.0', 6668)
+    app.run('0.0.0.0', 6668, debug=True)
