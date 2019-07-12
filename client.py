@@ -1,5 +1,6 @@
+from track import Track
+
 import numpy as np
-import kcftracker
 import requests
 import asyncio  # todo
 import cv2
@@ -31,37 +32,37 @@ def query(feature):
     return response.json()
 
 
-def color(idx):
-    return (0, 255, 0)
+def _nd2file(img_nd):
+    return BytesIO(cv2.imencode('.jpg', img_nd)[1])
+
+
+def _cvt_ltrb2ltwh(boxes):
+    boxes[:, 2: 4] -= boxes[:, :2]
+    return boxes[:, :4]
 
 
 if __name__ == '__main__':
     cap = cv2.VideoCapture('/home/wanghao/Videos/CVPR19-02.mp4')
     frame_count = 0
     INTEVAL = 24
-    trackers = {}
+
     while cap.isOpened():
         ret, frame = cap.read()
-        frame_ = frame.copy()
+        frame_ = frame.copy()       # no drawing
         if not ret:
             break
-        if frame_count % INTEVAL:
-            # tracking
-            for i, t in trackers.items():
-                boundingbox = t.update(frame_)  # l,t, w,h
-                l, t, w, h = map(int, boundingbox)
-                cv2.rectangle(frame, (l, t), (l+w, t+h), color(i), 1)
-        else:
-            # detect & extract
-            boxes = det(BytesIO(cv2.imencode('.jpg', frame_)[1]))
-            for i, (l, t, r, b, c) in enumerate(boxes):
-                l, t, r, b = map(int, [l, t, r, b])
-                cv2.rectangle(frame, (l, t), (r, b), color(i), 2)
-                cv2.putText(frame, '%.2f' % c, (l, t), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color(i), 2)
-                tracker = kcftracker.KCFTracker(False, True, True)
-                tracker.init([l, t, r-l, b-t], frame_)
-                # assign box to tracker
-                trackers[i] = tracker
+        Track.step(frame_)
+        if frame_count % INTEVAL == 0:
+            boxes = det(_nd2file(frame_))
+            boxes = np.array(boxes)
+            boxes = _cvt_ltrb2ltwh(boxes)
+            Track.update(frame_, boxes)
+            for t in Track.ALL:
+                if t.is_valid():
+                    pass
+                    # img_roi = crop(frame, t.box)
+                    # t.feature = ext(_nd2file(img_roi))
+        Track.render(frame)
         cv2.imshow('tracking', frame)
         c = cv2.waitKey(1) & 0xFF
         if c == 27 or c == ord('q'):
