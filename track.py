@@ -97,8 +97,8 @@ class Track:
             r = l + w
             b = t + h
             cv2.rectangle(frame, (l, t), (r, b), trk.color, 2)
-            cv2.putText(frame, f'{trk.age}', (l, b), cv2.FONT_HERSHEY_SIMPLEX, 0.6, trk.color, 2)
-            cv2.putText(frame, f'{trk.id}', (l, t), cv2.FONT_HERSHEY_SIMPLEX, 0.6, trk.color, 2)
+            cv2.putText(frame, '{}'.format(trk.age), (l, b), cv2.FONT_HERSHEY_SIMPLEX, 0.6, trk.color, 2)
+            cv2.putText(frame, '{}'.format(trk.id), (l, t), cv2.FONT_HERSHEY_SIMPLEX, 0.6, trk.color, 2)
             # cv2.putText(frame, f'v: {np.linalg.norm(trk.velocity[:2])}', (r, b), cv2.FONT_HERSHEY_SIMPLEX, 0.6, trk.color, 2)
 
     @classmethod

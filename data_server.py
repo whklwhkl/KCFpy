@@ -35,7 +35,7 @@ def query():
         idx = np.argmax(similarity_lst)
         if similarity_lst[idx] > MIN_SIMILARITY:
             ret = id_lst[idx]
-    return jsonify(ret)
+    return jsonify({'id': ret, 'idx': hash(ret) % 256})
 
 
 if __name__ == '__main__':

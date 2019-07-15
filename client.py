@@ -4,6 +4,7 @@ from colors import colors
 import numpy as np
 import requests
 import tkinter
+import hashlib
 import asyncio  # todo
 import cv2
 from io import BytesIO
@@ -119,10 +120,11 @@ if __name__ == '__main__':
                 if t.is_valid():
                     img_roi = _crop(frame, t.box)
                     t.feature = ext(_nd2file(img_roi))
-                    i = query(t.feature)
+                    id_idx = query(t.feature)
+                    i = id_idx.get('id')
                     if i is not None and i != -1:
                         t.id = i
-                        t.color = colors[hash(i) % 256]
+                        t.color = colors[id_idx.get('idx')]
         Track.render(frame)
         cv2.imshow('tracking', frame)
         c = cv2.waitKey(1) & 0xFF
