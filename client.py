@@ -4,10 +4,12 @@ from colors import colors
 import numpy as np
 import requests
 import tkinter
-import hashlib
 import asyncio  # todo
 import cv2
+from time import time
 from io import BytesIO
+from threading import Thread
+from queue import Queue
 
 
 DET_URL = 'http://192.168.20.122:6666/det'
@@ -75,7 +77,7 @@ class Entry:
         self.buttonN.pack()
 
     def show(self):
-        self.window.mainloop()
+        target = self.window.mainloop()
 
     def destroy(self):
         self.window.destroy()
@@ -89,45 +91,94 @@ def get_click_point(event, x, y, flags, param):
         for trk in Track.ALL:
             l, t, w, h = trk.box
             if l < x < l + w and t < y < t + h:
-                img_roi = _crop(frame, trk.box)
-                trk.feature = ext(_nd2file(img_roi))
-                entry = Entry()
-                entry.show()
-                up(entry.content, trk.feature)
+
+                def work():
+                    img_roi = _crop(frame, trk.box)
+                    trk.feature = ext(_nd2file(img_roi))
+                    entry = Entry()
+                    entry.show()
+                    up(entry.content, trk.feature)
+
+                th = Thread(target=work)
+                th.start()
                 break
 
 
+class Worker:
+    def __init__(self, func):
+        self.q = Queue(maxsize=32)  # in
+        self.p = Queue(maxsize=32)  # out
+        self.running = True
+
+        def loop():
+            while self.running:
+                try:
+                    i = self.q.get()
+                    o = func(*i)
+                    self.p.put(o)
+                except Exception:
+                    continue
+
+        self.th = Thread(target=loop, daemon=True)
+        self.th.start()
+
+    def put(self, *args):
+        self.q.put(args)
+
+    def get(self):
+        return self.p.get()
+
+
 if __name__ == '__main__':
-    # cap = cv2.VideoCapture('/home/wanghao/Videos/CVPR19-02.mp4')
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture('/home/wanghao/Videos/CVPR19-02.mp4')
+    # cap = cv2.VideoCapture(0)
     frame_count = 0
     INTEVAL = 24
     win = cv2.namedWindow('tracking')
     cv2.setMouseCallback('tracking', get_click_point)
+    w_det = Worker(lambda x: (x, det(_nd2file(x))))
+    w_ext = Worker(lambda i, x: (i, ext(_nd2file(x))))
+    w_cmp = Worker(lambda i, x: (i, query(x)))
 
     while cap.isOpened():
         ret, frame = cap.read()
-        frame_ = frame.copy()       # no drawing
-        if not ret:
+        if not ret or frame is None:
             break
+        frame_ = frame.copy()       # no drawing
         Track.step(frame_)
         if frame_count % INTEVAL == 0:
-            boxes = det(_nd2file(frame_))
+            w_det.put(frame_)
+
+        if not w_det.p.empty():
+            frame_, boxes = w_det.get()
             if len(boxes):
                 boxes = _cvt_ltrb2ltwh(boxes)
                 Track.update(frame_, boxes)
-            for t in Track.ALL:
-                if t.is_valid():
-                    img_roi = _crop(frame, t.box)
-                    t.feature = ext(_nd2file(img_roi))
-                    id_idx = query(t.feature)
-                    i = id_idx.get('id')
-                    if i is not None and i != -1:
-                        t.id = i
-                        t.color = colors[id_idx.get('idx')]
+                for t in Track.ALL:
+                    if t.is_valid() and t.visible:
+                        img_roi = _crop(frame_, t.box)
+                        w_ext.put(t, img_roi)
+
+        if not w_ext.p.empty():
+            t, feature = w_ext.get()
+            t.feature = feature
+            w_cmp.put(t, feature)
+
+        if not w_cmp.p.empty():
+            t, id_idx = w_cmp.get()
+            i = id_idx.get('id')
+            if i is not None and i != -1:
+                t.id = i
+                t.color = colors[id_idx.get('idx')]
+
         Track.render(frame)
         cv2.imshow('tracking', frame)
         c = cv2.waitKey(1) & 0xFF
         if c == 27 or c == ord('q'):
             break
         frame_count += 1
+
+    cv2.destroyAllWindows()
+    for w in [w_ext, w_det, w_cmp]:
+        w.running = False
+        w.th.join(0.5)

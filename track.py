@@ -13,7 +13,7 @@ class Track:
     current_id = 0
     health = 2  # positive means visible
     is_occluded = False
-    momentum = .9
+    momentum = .95
     momentum_ = 1 - momentum
     velocity = np.zeros([4])
     # STATIC
@@ -21,11 +21,12 @@ class Track:
     BIRTH_IOU = .5
     CANDIDATE_IOU = .55
     OCCLUSION_IOU = .4
-    PROBATION = 1
+    PROBATION = 2
     MINIMUM_CONFIDENCE = .6
 
     def __init__(self, frame, init_box, feature=None):
         self.box = init_box
+        self.visible = True
         # todo: estimate v3d using 2d info
         self.descriptor = feature           # appearance
         self.tracker = KCFTracker(False, True, True)
@@ -37,11 +38,15 @@ class Track:
     def step1(self, frame):
         new_box = self.tracker.update(frame)
         new_box = np.array(new_box)
-        self.velocity = (new_box - self.box) * Track.momentum_ + self.velocity * Track.momentum
+        ds = new_box - self.box
+        ds_ = ds if self.velocity is None else self.velocity
+        self.velocity = ds * Track.momentum_ + ds_ * Track.momentum
         self.box = new_box
+        self.visible = True
 
     def step0(self):
         self.box += self.velocity * np.array([1, 1, 0, 0])
+        self.visible = False
 
     def is_valid(self):
         return self.age >= Track.PROBATION
@@ -93,13 +98,14 @@ class Track:
     @classmethod
     def render(cls, frame):
         for trk in cls.ALL:
-            l, t, w, h = map(int, trk.box)
-            r = l + w
-            b = t + h
-            cv2.rectangle(frame, (l, t), (r, b), trk.color, 2)
-            cv2.putText(frame, '{}'.format(trk.age), (l, b), cv2.FONT_HERSHEY_SIMPLEX, 0.6, trk.color, 2)
-            cv2.putText(frame, '{}'.format(trk.id), (l, t), cv2.FONT_HERSHEY_SIMPLEX, 0.6, trk.color, 2)
-            # cv2.putText(frame, f'v: {np.linalg.norm(trk.velocity[:2])}', (r, b), cv2.FONT_HERSHEY_SIMPLEX, 0.6, trk.color, 2)
+            if trk.is_valid() and trk.visible:
+                l, t, w, h = map(int, trk.box)
+                r = l + w
+                b = t + h
+                cv2.rectangle(frame, (l, t), (r, b), trk.color, 2)
+                cv2.putText(frame, '{}'.format(trk.age), (l, b), cv2.FONT_HERSHEY_SIMPLEX, 0.6, trk.color, 2)
+                cv2.putText(frame, '{}'.format(trk.id), (l, t), cv2.FONT_HERSHEY_SIMPLEX, 0.6, trk.color, 2)
+                # cv2.putText(frame, f'v: {np.linalg.norm(trk.velocity[:2])}', (r, b), cv2.FONT_HERSHEY_SIMPLEX, 0.6, trk.color, 2)
 
     @classmethod
     def _gather(cls):
