@@ -3,6 +3,7 @@ from colors import colors
 
 import numpy as np
 import requests
+import tkinter
 import asyncio  # todo
 import cv2
 from io import BytesIO
@@ -54,11 +55,54 @@ def _crop(frame, trk_box):
     return cv2.resize(crop, (128, 384))
 
 
+class Entry:
+    def __init__(self):
+        self.window = tkinter.Tk()
+        self.label = tkinter.Label(self.window, text='name:')
+        self.label.pack()
+        self.entry = tkinter.Entry(self.window)
+        self.entry.pack()
+        self.content = None
+
+        def set_name():
+            self.content = self.entry.get()
+            self.destroy()
+
+        self.buttonY = tkinter.Button(self.window, text='confirm', command=set_name)
+        self.buttonY.pack()
+        self.buttonN = tkinter.Button(self.window, text='cancle', command=self.destroy)
+        self.buttonN.pack()
+
+    def show(self):
+        self.window.mainloop()
+
+    def destroy(self):
+        self.window.destroy()
+
+
+frame = None
+
+
+def get_click_point(event, x, y, flags, param):
+    if event == cv2.EVENT_LBUTTONDOWN:
+        for trk in Track.ALL:
+            l, t, w, h = trk.box
+            if l < x < l + w and t < y < t + h:
+                img_roi = _crop(frame, trk.box)
+                trk.feature = ext(_nd2file(img_roi))
+                entry = Entry()
+                entry.show()
+                up(entry.content, trk.feature)
+                break
+
+
 if __name__ == '__main__':
     # cap = cv2.VideoCapture('/home/wanghao/Videos/CVPR19-02.mp4')
     cap = cv2.VideoCapture(0)
     frame_count = 0
     INTEVAL = 24
+    win = cv2.namedWindow('tracking')
+    cv2.setMouseCallback('tracking', get_click_point)
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -73,12 +117,12 @@ if __name__ == '__main__':
                 Track.update(frame_, boxes)
             for t in Track.ALL:
                 if t.is_valid():
-                    t.color = colors[t.id % 256]
                     img_roi = _crop(frame, t.box)
                     t.feature = ext(_nd2file(img_roi))
-                    up(t.id, t.feature)
                     i = query(t.feature)
-                    assert i == t.id
+                    if i is not None and i != -1:
+                        t.id = i
+                        t.color = colors[hash(i) % 256]
         Track.render(frame)
         cv2.imshow('tracking', frame)
         c = cv2.waitKey(1) & 0xFF
