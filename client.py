@@ -10,6 +10,7 @@ from time import time
 from io import BytesIO
 from threading import Thread
 from queue import Queue
+from termcolor import colored
 
 
 DET_URL = 'http://192.168.20.122:6666/det'
@@ -139,6 +140,7 @@ if __name__ == '__main__':
     w_det = Worker(lambda x: (x, det(_nd2file(x))))
     w_ext = Worker(lambda i, x: (i, ext(_nd2file(x))))
     w_cmp = Worker(lambda i, x: (i, query(x)))
+    MATCHES = {}
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -155,9 +157,10 @@ if __name__ == '__main__':
                 boxes = _cvt_ltrb2ltwh(boxes)
                 Track.update(frame_, boxes)
                 for t in Track.ALL:
-                    if t.is_valid() and t.visible:
+                    if t.visible:
                         img_roi = _crop(frame_, t.box)
                         w_ext.put(t, img_roi)
+            Track.decay()
 
         if not w_ext.p.empty():
             t, feature = w_ext.get()
@@ -165,11 +168,24 @@ if __name__ == '__main__':
             w_cmp.put(t, feature)
 
         if not w_cmp.p.empty():
-            t, id_idx = w_cmp.get()
-            i = id_idx.get('id')
+            t, ret = w_cmp.get()
+            i = ret.get('id')
+            c = colors[ret.get('idx')]
             if i is not None and i != -1:
-                t.id = i
-                t.color = colors[id_idx.get('idx')]
+                t.similarity = ret.get('similarity')
+                if i in MATCHES and MATCHES[i] < t:
+                    f = MATCHES[i]
+                    f.color = Track.color
+                    f.id = -1
+                    f.similarity = 0
+                    t.color = c
+                    t.id = i
+                    MATCHES[i] = t
+                elif i not in MATCHES:
+                    t.color = c
+                    t.id = i
+                    MATCHES[i] = t
+            # print(colored('%d'%len(MATCHES), 'green'))
 
         Track.render(frame)
         cv2.imshow('tracking', frame)

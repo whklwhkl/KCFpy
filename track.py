@@ -15,12 +15,13 @@ class Track:
     is_occluded = False
     momentum = .95
     momentum_ = 1 - momentum
+    similarity = 0
     velocity = np.zeros([4])
     # STATIC
     ALL = set()
     BIRTH_IOU = .5
     CANDIDATE_IOU = .55
-    OCCLUSION_IOU = .4
+    OCCLUSION_IOU = .45
     PROBATION = 2
     MINIMUM_CONFIDENCE = .6
 
@@ -32,8 +33,8 @@ class Track:
         self.tracker = KCFTracker(False, True, True)
         self.tracker.init(init_box, frame)
         self.id = Track.current_id
-        Track.ALL.add(self)
-        Track.current_id += 1
+        type(self).ALL.add(self)
+        type(self).current_id += 1
 
     def step1(self, frame):
         new_box = self.tracker.update(frame)
@@ -47,9 +48,28 @@ class Track:
     def step0(self):
         self.box += self.velocity * np.array([1, 1, 0, 0])
         self.visible = False
+        self.health -= 1
 
     def is_valid(self):
         return self.age >= Track.PROBATION
+
+    def _render(self, frame):
+        l, t, w, h = map(int, self.box)
+        r = l + w
+        b = t + h
+        cv2.rectangle(frame, (l, t), (r, b), self.color, 2)
+
+        def text(t, x, y, size=.9):
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            cv2.putText(frame, t, (x, y), font, size, self.color, 2)
+
+        text('HP:%d' % self.health, l, t - 3, .6)
+        text('LV:%d' % self.age, l + 3, b - 3, .6)
+        text(self.id if isinstance(self.id, str) else '?', r, t)
+        text('{:.2f}'.format(self.similarity), r, b, .6)
+
+    def __gt__(self, other):
+        return self.similarity > other.similarity
 
     @classmethod
     def update(cls, frame, det_boxes):
@@ -57,28 +77,34 @@ class Track:
         if len(trk_boxes):
             iou_mtx = iou(trk_boxes, det_boxes)
             match_trk = np.any(iou_mtx > cls.CANDIDATE_IOU, 1)
-            dead_trks = []
             for iou_det, m, t in zip(iou_mtx, match_trk, tracks):
                 if m:
-                    t.age += 1
-                    t.health = cls.health
+                    t.visible = True
                     t.tracker = KCFTracker(False, True, True)
                     det_idx = np.argmax(iou_det)
                     t.tracker.init(det_boxes[det_idx], frame)
-                elif t.age < cls.PROBATION:
-                    t.health -= 9999
                 else:
-                    t.health -= 1
-                if t.health < 0:
-                    dead_trks += [t]
-            for t in dead_trks:
-                cls.ALL.remove(t)
+                    t.visible = False
             no_match_det = np.all(iou_mtx < cls.BIRTH_IOU, 0)
             for box in det_boxes[no_match_det]:
                 cls(frame, box)
         else:
             for box in det_boxes:
                 cls(frame, box)
+
+    @classmethod
+    def decay(cls):
+        dead_trks = []
+        for t in cls.ALL:
+            if t.visible:
+                t.age += 1
+                t.health = cls.health
+            else:
+                t.health -= 1 if t.age >= cls.PROBATION else 9999
+            if t.health < 0:
+                dead_trks += [t]
+        for t in dead_trks:
+            cls.ALL.remove(t)
 
     @classmethod
     def step(cls, frame):
@@ -96,22 +122,16 @@ class Track:
                 t.step1(frame)
 
     @classmethod
-    def render(cls, frame):
-        for trk in cls.ALL:
-            if trk.is_valid() and trk.visible:
-                l, t, w, h = map(int, trk.box)
-                r = l + w
-                b = t + h
-                cv2.rectangle(frame, (l, t), (r, b), trk.color, 2)
-                cv2.putText(frame, '{}'.format(trk.age), (l, b), cv2.FONT_HERSHEY_SIMPLEX, 0.6, trk.color, 2)
-                cv2.putText(frame, '{}'.format(trk.id), (l, t), cv2.FONT_HERSHEY_SIMPLEX, 0.6, trk.color, 2)
-                # cv2.putText(frame, f'v: {np.linalg.norm(trk.velocity[:2])}', (r, b), cv2.FONT_HERSHEY_SIMPLEX, 0.6, trk.color, 2)
-
-    @classmethod
     def _gather(cls):
         tracks = list(cls.ALL)
         trk_boxes = list(map(lambda t: t.box, tracks))
         return tracks, np.array(trk_boxes)
+
+    @classmethod
+    def render(cls, frame):
+        cv2.putText(frame, 'Tracks:%d' % len(cls.ALL), (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+        for trk in cls.ALL:
+            trk._render(frame)
 
 
 def iou(boxes1, boxes2):
