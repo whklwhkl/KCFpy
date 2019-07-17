@@ -20,10 +20,9 @@ class Track:
     # STATIC
     ALL = set()
     BIRTH_IOU = .5
-    CANDIDATE_IOU = .55
+    CANDIDATE_IOU = .75
     OCCLUSION_IOU = .45
     PROBATION = 2
-    MINIMUM_CONFIDENCE = .6
 
     def __init__(self, frame, init_box, feature=None):
         self.box = init_box

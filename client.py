@@ -144,6 +144,7 @@ if __name__ == '__main__':
     cap = cv2.VideoCapture(cam_id)
     frame_count = 0
     INTEVAL = 24
+    FORGETTING = .99
     win = cv2.namedWindow('tracking')
     cv2.setMouseCallback('tracking', get_click_point)
     w_det = Worker(lambda x: (x, det(_nd2file(x))))
@@ -161,7 +162,7 @@ if __name__ == '__main__':
             w_det.put(frame_)
             for t in MATCHES.values():
                 if not t.visible:
-                    t.similarity *= 0.99    # forgetting
+                    t.similarity *= FORGETTING    # forgetting
 
         if not w_det.p.empty():
             frame_, boxes = w_det.get()
