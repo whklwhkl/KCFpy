@@ -17,5 +17,16 @@ Download the sources and execute
 ```shell
 git clone https://github.com/uoip/KCFpy.git
 cd KCFpy
-python client.py
+```
+
+start `data_server` for data persistence
+
+```shell
+python data_server.py
+```
+
+start `client`, may run multiple copies with different settings
+
+```shell
+python client.py ${CAMERA_ID} # like 0, 1, 2, 3...
 ```
