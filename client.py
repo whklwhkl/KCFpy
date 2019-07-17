@@ -17,23 +17,29 @@ DET_URL = 'http://192.168.20.122:6666/det'
 EXT_URL = 'http://192.168.20.122:6667/ext'
 CMP_URL = 'http://192.168.20.122:6668/{}'
 
+api_calls = {'register': 0, 'detection': 0, 'feature': 0, 'query': 0, }
+
 
 def det(img_file):
+    api_calls['detection'] += 1
     response = requests.post(DET_URL, files={'img': img_file})
     return response.json()
 
 
 def ext(img_file):
+    api_calls['feature'] += 1
     response = requests.post(EXT_URL, files={'img': img_file})
     return response.json()
 
 
 def up(identity, feature):
+    api_calls['register'] += 1
     response = requests.post(CMP_URL.format('update'), json={'id': identity, 'feature': feature})
     response.json()
 
 
 def query(feature):
+    api_calls['query'] += 1
     response = requests.post(CMP_URL.format('query'), json={'id': '', 'feature': feature})
     return response.json()
 
@@ -86,7 +92,7 @@ class Entry:
 
 frame = None
 
-
+q_reg = Queue(1)
 def get_click_point(event, x, y, flags, param):
     if event == cv2.EVENT_LBUTTONDOWN:
         for trk in Track.ALL:
@@ -99,6 +105,7 @@ def get_click_point(event, x, y, flags, param):
                     entry = Entry()
                     entry.show()
                     up(entry.content, trk.feature)
+                    q_reg.put(1)
 
                 th = Thread(target=work)
                 th.start()
@@ -131,8 +138,10 @@ class Worker:
 
 
 if __name__ == '__main__':
-    cap = cv2.VideoCapture('/home/wanghao/Videos/CVPR19-02.mp4')
-    # cap = cv2.VideoCapture(0)
+    import sys
+    cam_id = int(sys.argv[1])
+    # cap = cv2.VideoCapture('/home/wanghao/Videos/CVPR19-02.mp4')
+    cap = cv2.VideoCapture(cam_id)
     frame_count = 0
     INTEVAL = 24
     win = cv2.namedWindow('tracking')
@@ -150,6 +159,9 @@ if __name__ == '__main__':
         Track.step(frame_)
         if frame_count % INTEVAL == 0:
             w_det.put(frame_)
+            for t in MATCHES.values():
+                if not t.visible:
+                    t.similarity *= 0.99    # forgetting
 
         if not w_det.p.empty():
             frame_, boxes = w_det.get()
@@ -157,10 +169,16 @@ if __name__ == '__main__':
                 boxes = _cvt_ltrb2ltwh(boxes)
                 Track.update(frame_, boxes)
                 for t in Track.ALL:
-                    if t.visible:
+                    if t.visible and t.feature is None:
                         img_roi = _crop(frame_, t.box)
                         w_ext.put(t, img_roi)
             Track.decay()
+
+        if not q_reg.empty():
+            q_reg.get()
+            for t in Track.ALL:
+                if t.feature is not None:
+                    w_cmp.put(t, t.feature)
 
         if not w_ext.p.empty():
             t, feature = w_ext.get()
@@ -188,6 +206,9 @@ if __name__ == '__main__':
             # print(colored('%d'%len(MATCHES), 'green'))
 
         Track.render(frame)
+        for i, kv in enumerate(api_calls.items()):
+            cv2.putText(frame, '{:<10}'.format(kv[0]), (10, i*20 + 60), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 0), 2)
+            cv2.putText(frame, '{:>6}'.format(kv[1]), (100, i*20 + 60), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 0), 2)
         cv2.imshow('tracking', frame)
         c = cv2.waitKey(1) & 0xFF
         if c == 27 or c == ord('q'):

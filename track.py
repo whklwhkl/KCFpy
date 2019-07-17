@@ -29,7 +29,7 @@ class Track:
         self.box = init_box
         self.visible = True
         # todo: estimate v3d using 2d info
-        self.descriptor = feature           # appearance
+        self.feature = feature           # appearance
         self.tracker = KCFTracker(False, True, True)
         self.tracker.init(init_box, frame)
         self.id = Track.current_id
@@ -48,7 +48,7 @@ class Track:
     def step0(self):
         self.box += self.velocity * np.array([1, 1, 0, 0])
         self.visible = False
-        self.health -= 1
+        # self.health -= 1
 
     def is_valid(self):
         return self.age >= Track.PROBATION
@@ -79,7 +79,6 @@ class Track:
             match_trk = np.any(iou_mtx > cls.CANDIDATE_IOU, 1)
             for iou_det, m, t in zip(iou_mtx, match_trk, tracks):
                 if m:
-                    t.visible = True
                     t.tracker = KCFTracker(False, True, True)
                     det_idx = np.argmax(iou_det)
                     t.tracker.init(det_boxes[det_idx], frame)
@@ -130,8 +129,15 @@ class Track:
     @classmethod
     def render(cls, frame):
         cv2.putText(frame, 'Tracks:%d' % len(cls.ALL), (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+        trk_lst = []
         for trk in cls.ALL:
-            trk._render(frame)
+            if isinstance(trk.id, str):
+                trk_lst += [trk]
+            else:
+                trk._render(frame)  # unmatched tracks
+        for trk in trk_lst:
+            if trk.visible:
+                trk._render(frame)  # tracks with matched ids
 
 
 def iou(boxes1, boxes2):
