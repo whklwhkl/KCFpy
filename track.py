@@ -42,6 +42,12 @@ class Track:
         ds_ = ds if self.velocity is None else self.velocity
         self.velocity = ds * Track.momentum_ + ds_ * Track.momentum
         self.box = new_box
+        H, W = frame.shape[:2]
+        l, t, h, w = self.box
+        if 0 < (l+w/2) < W and 0 < (t+h/2) < H:
+            pass
+        else:
+            self.visible = False
 
     def step0(self):
         self.box += self.velocity * np.array([1, 1, 0, 0])

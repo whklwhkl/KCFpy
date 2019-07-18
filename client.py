@@ -161,7 +161,7 @@ if __name__ == '__main__':
         if frame_count % INTEVAL == 0:
             w_det.put(frame_)
             for t in MATCHES.values():
-                if not t.visible:
+                if not t.visible and t.health > 0:
                     t.similarity *= FORGETTING    # forgetting
 
         if not w_det.p.empty():
