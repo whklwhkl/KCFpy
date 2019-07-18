@@ -139,7 +139,11 @@ class Worker:
 
 if __name__ == '__main__':
     import sys
-    cam_id = int(sys.argv[1])
+    cam_id = sys.argv[1]
+    try:
+        cam_id = int(cam_id)
+    except ValueError:
+        print('using other source')
     # cap = cv2.VideoCapture('/home/wanghao/Videos/CVPR19-02.mp4')
     cap = cv2.VideoCapture(cam_id)
     frame_count = 0
