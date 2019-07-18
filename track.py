@@ -87,11 +87,10 @@ class Track:
                     t.tracker = KCFTracker(False, True, True)
                     det_idx = np.argmax(iou_det)
                     t.tracker.init(det_boxes[det_idx], frame)
+                    t.visible = True
                 else:
-                    t.health -= 1
                     t.visible = False
-                    if t.age < cls.PROBATION:
-                        t.health -= 9999
+                    
             no_match_det = np.all(iou_mtx < cls.BIRTH_IOU, 0)
             for box in det_boxes[no_match_det]:
                 cls(frame, box)
@@ -103,6 +102,10 @@ class Track:
     def decay(cls):
         dead_trks = []
         for t in cls.ALL:
+            if not t.visible:
+                t.health -= 1
+                if t.age < cls.PROBATION:
+                        t.health -= 9999
             if t.health < 0:
                 dead_trks += [t]
         for t in dead_trks:
@@ -122,7 +125,7 @@ class Track:
                 t.visible = False
                 t.step0()
             else:
-                t.visible = True
+                # t.visible = True
                 t.step1(frame)
 
     @classmethod

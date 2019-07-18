@@ -161,8 +161,10 @@ if __name__ == '__main__':
         if frame_count % INTEVAL == 0:
             w_det.put(frame_)
             for t in MATCHES.values():
-                if not t.visible and t.health > 0:
+                if not t.visible:
+                    # and t.health > 0
                     t.similarity *= FORGETTING    # forgetting
+            Track.decay()
 
         if not w_det.p.empty():
             frame_, boxes = w_det.get()
@@ -173,7 +175,10 @@ if __name__ == '__main__':
                     if t.visible and t.feature is None:
                         img_roi = _crop(frame_, t.box)
                         w_ext.put(t, img_roi)
-            Track.decay()
+            else:
+                for t in Track.ALL:
+                    t.visible = False
+                    t.health -= 1 if t.age > Track.PROBATION else 9999
 
         if not q_reg.empty():
             q_reg.get()
@@ -192,18 +197,19 @@ if __name__ == '__main__':
             c = colors[ret.get('idx')]
             if i is not None and i != -1:
                 t.similarity = ret.get('similarity')
-                if i in MATCHES and MATCHES[i] < t:
-                    f = MATCHES[i]
-                    f.color = Track.color
-                    f.id = -1
-                    f.similarity = 0
-                    t.color = c
-                    t.id = i
-                    MATCHES[i] = t
-                elif i not in MATCHES:
-                    t.color = c
-                    t.id = i
-                    MATCHES[i] = t
+                if t.similarity > .90:
+                    if i in MATCHES and MATCHES[i] < t:
+                        f = MATCHES[i]
+                        f.color = Track.color
+                        f.id = -1
+                        f.similarity = 0
+                        t.color = c
+                        t.id = i
+                        MATCHES[i] = t
+                    elif i not in MATCHES:
+                        t.color = c
+                        t.id = i
+                        MATCHES[i] = t
             # print(colored('%d'%len(MATCHES), 'green'))
 
         Track.render(frame)
