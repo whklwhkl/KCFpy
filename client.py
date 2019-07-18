@@ -10,7 +10,7 @@ from time import time
 from io import BytesIO
 from threading import Thread
 from queue import Queue
-from termcolor import colored
+# from termcolor import colored
 
 
 DET_URL = 'http://192.168.20.122:6666/det'
@@ -208,8 +208,8 @@ if __name__ == '__main__':
 
         Track.render(frame)
         for i, kv in enumerate(api_calls.items()):
-            cv2.putText(frame, '{:<10}'.format(kv[0]), (10, i*20 + 60), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 0), 2)
-            cv2.putText(frame, '{:>6}'.format(kv[1]), (100, i*20 + 60), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 0), 2)
+            cv2.putText(frame, '{:<10}'.format(kv[0]), (10, i*20 + 60), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 0), 1)
+            cv2.putText(frame, '{:>6}'.format(kv[1]), (100, i*20 + 60), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 0), 1)
         cv2.imshow('tracking', frame)
         c = cv2.waitKey(1) & 0xFF
         if c == 27 or c == ord('q'):

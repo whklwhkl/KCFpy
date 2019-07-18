@@ -42,11 +42,9 @@ class Track:
         ds_ = ds if self.velocity is None else self.velocity
         self.velocity = ds * Track.momentum_ + ds_ * Track.momentum
         self.box = new_box
-        self.visible = True
 
     def step0(self):
         self.box += self.velocity * np.array([1, 1, 0, 0])
-        self.visible = False
         # self.health -= 1
 
     def is_valid(self):
@@ -78,6 +76,7 @@ class Track:
             match_trk = np.any(iou_mtx > cls.CANDIDATE_IOU, 1)
             for iou_det, m, t in zip(iou_mtx, match_trk, tracks):
                 if m:
+                    t.age += 1
                     t.tracker = KCFTracker(False, True, True)
                     det_idx = np.argmax(iou_det)
                     t.tracker.init(det_boxes[det_idx], frame)
@@ -95,7 +94,6 @@ class Track:
         dead_trks = []
         for t in cls.ALL:
             if t.visible:
-                t.age += 1
                 t.health = cls.health
             else:
                 t.health -= 1 if t.age >= cls.PROBATION else 9999
@@ -115,8 +113,10 @@ class Track:
         dead_trks = []
         for occ, t in zip(occlusion_mask, tracks):
             if occ:
+                t.visible = False
                 t.step0()
             else:
+                t.visible = True
                 t.step1(frame)
 
     @classmethod
