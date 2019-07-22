@@ -12,12 +12,14 @@ from threading import Thread
 from queue import Queue
 # from termcolor import colored
 
+# HOST = '192.168.1.100'  # 192.168.20.122
+HOST = '192.168.20.122'  # 192.168.20.122
 
-DET_URL = 'http://192.168.20.122:6666/det'
-EXT_URL = 'http://192.168.20.122:6667/ext'
-CMP_URL = 'http://192.168.20.122:6668/{}'
+DET_URL = 'http://%s:6666/det' % HOST
+EXT_URL = 'http://%s:6667/ext' % HOST
+CMP_URL = 'http://%s:6668/{}' % HOST
 
-api_calls = {'register': 0, 'detection': 0, 'feature': 0, 'query': 0, }
+api_calls = {'register': 0, 'detection': 0, 'feature': 0, 'query': 0, 'refresh': 0}
 
 
 def det(img_file):
@@ -144,6 +146,11 @@ if __name__ == '__main__':
         cam_id = int(cam_id)
     except ValueError:
         print('using other source')
+        if 'udp' in cam_id:
+            import os
+            print('udp')
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport:udp"
+
     # cap = cv2.VideoCapture('/home/wanghao/Videos/CVPR19-02.mp4')
     cap = cv2.VideoCapture(cam_id)
     frame_count = 0
@@ -169,6 +176,7 @@ if __name__ == '__main__':
                     # and t.health > 0
                     t.similarity *= FORGETTING    # forgetting
             Track.decay()
+            # refresh features when abnormal aspect ratio is detected
 
         if not w_det.p.empty():
             frame_, boxes = w_det.get()
@@ -176,7 +184,9 @@ if __name__ == '__main__':
                 boxes = _cvt_ltrb2ltwh(boxes)
                 Track.update(frame_, boxes)
                 for t in Track.ALL:
-                    if t.visible and t.feature is None:
+                    if t.visible and t.feature is None or t.distorted:
+                        if t.distorted:
+                            api_calls['refresh'] += 1
                         img_roi = _crop(frame_, t.box)
                         w_ext.put(t, img_roi)
             else:

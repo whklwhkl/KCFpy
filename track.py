@@ -9,7 +9,9 @@ from kcftracker import KCFTracker
 class Track:
     # DEFAULT
     age = 0     # age < PROBATION means is_candidate
+    aspects = []   # w/h
     color = (128, 128, 128)  # gray
+    distorted = False
     current_id = 0
     health = 2  # positive means visible
     is_occluded = False
@@ -21,7 +23,7 @@ class Track:
     ALL = set()
     BIRTH_IOU = .5
     CANDIDATE_IOU = .75
-    OCCLUSION_IOU = .45
+    OCCLUSION_IOU = .65
     PROBATION = 2
 
     def __init__(self, frame, init_box, feature=None):
@@ -86,11 +88,18 @@ class Track:
                     t.health = cls.health
                     t.tracker = KCFTracker(False, True, True)
                     det_idx = np.argmax(iou_det)
-                    t.tracker.init(det_boxes[det_idx], frame)
+                    box = det_boxes[det_idx]
+                    t.tracker.init(box, frame)
+                    # todo: if det box is far away from trk box, refresh feature
+                    if iou_det[det_idx] < .8:
+                        t.distorted = True
+                    else:
+                        t.distorted = False
+                    t.box = box
                     t.visible = True
                 else:
                     t.visible = False
-                    
+
             no_match_det = np.all(iou_mtx < cls.BIRTH_IOU, 0)
             for box in det_boxes[no_match_det]:
                 cls(frame, box)
@@ -105,7 +114,7 @@ class Track:
             if not t.visible:
                 t.health -= 1
                 if t.age < cls.PROBATION:
-                        t.health -= 9999
+                    t.health -= 9999
             if t.health < 0:
                 dead_trks += [t]
         for t in dead_trks:
