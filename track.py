@@ -118,6 +118,7 @@ class Track:
             if t.health < 0:
                 dead_trks += [t]
         for t in dead_trks:
+            t.similarity *= 0.95
             cls.ALL.remove(t)
 
     @classmethod
