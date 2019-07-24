@@ -64,13 +64,13 @@ class Track:
         b = t + h
         cv2.rectangle(frame, (l, t), (r, b), self.color, 2)
 
-        def text(t, x, y, size=.9):
+        def text(t, x, y, size=.9, thickness=2):
             font = cv2.FONT_HERSHEY_SIMPLEX
-            cv2.putText(frame, t, (x, y), font, size, self.color, 2)
+            cv2.putText(frame, t, (x, y), font, size, self.color, thickness)
 
         text('HP:%d' % self.health, l, t - 3, .6)
         text('LV:%d' % self.age, l + 3, b - 3, .6)
-        text(self.id if isinstance(self.id, str) else '?', r, t)
+        text(self.id if isinstance(self.id, str) else '?', r, t, 2.0, 4)
         text('{:.2f}'.format(self.similarity), r, b, .6)
 
     def __gt__(self, other):

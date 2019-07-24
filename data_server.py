@@ -18,7 +18,8 @@ def update():
 def compare(feature1, feature2):
     f1 = np.array(feature1)
     f2 = np.array(feature2)
-    return np.dot(f1, f2)/np.linalg.norm(f1)/np.linalg.norm(f2)
+    cos = np.dot(f1, f2)/np.linalg.norm(f1)/np.linalg.norm(f2)
+    return np.exp(cos - 1)
 
 
 @app.route('/query', methods=['POST'])
