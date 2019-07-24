@@ -77,31 +77,6 @@ def _crop(frame, trk_box):
     return cv2.resize(crop, (128, 384))
 
 
-class Entry:
-    def __init__(self):
-        self.window = tk.Tk()
-        self.label = tk.Label(self.window, text='name:')
-        self.label.pack()
-        self.entry = tk.Entry(self.window)
-        self.entry.pack()
-        self.content = None
-
-        def set_name():
-            self.content = self.entry.get()
-            self.destroy()
-
-        self.buttonY = tk.Button(self.window, text='confirm', command=set_name)
-        self.buttonY.pack()
-        self.buttonN = tk.Button(self.window, text='cancle', command=self.destroy)
-        self.buttonN.pack()
-
-    def show(self):
-        target = self.window.mainloop()
-
-    def destroy(self):
-        self.window.destroy()
-
-
 frame = None
 
 q_reg = Queue(32)
