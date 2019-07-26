@@ -20,8 +20,15 @@ class Worker:
         self.th = Thread(target=loop, daemon=True)
         self.th.start()
 
+    def has_feedback(self):
+        return not self.p.empty()
+
     def put(self, *args):
         self.q.put(args)
 
     def get(self):
         return self.p.get()
+
+    def suicide(self):
+        self.running = False
+        self.th.join(.5)

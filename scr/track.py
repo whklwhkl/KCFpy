@@ -1,15 +1,14 @@
 # all boxes here are of the format LTWH
+from .kcftracker import KCFTracker
 
 import cv2
 import numpy as np
 
-from kcftracker import KCFTracker
 
 
 class Track:
     # DEFAULT
     age = 0     # age < PROBATION means is_candidate
-    aspects = []   # w/h
     color = (128, 128, 128)  # gray
     distorted = False
     current_id = 0
@@ -33,7 +32,7 @@ class Track:
         self.feature = feature           # appearance
         self.tracker = KCFTracker(False, True, True)
         self.tracker.init(init_box, frame)
-        self.id = Track.current_id
+        self.id = type(self).current_id
         type(self).ALL.add(self)
         type(self).current_id += 1
 
@@ -90,7 +89,6 @@ class Track:
                     det_idx = np.argmax(iou_det)
                     box = det_boxes[det_idx]
                     t.tracker.init(box, frame)
-                    # todo: if det box is far away from trk box, refresh feature
                     if iou_det[det_idx] < .8:
                         t.distorted = True
                     else:
@@ -146,7 +144,8 @@ class Track:
 
     @classmethod
     def render(cls, frame):
-        cv2.putText(frame, 'Tracks:%d' % len(cls.ALL), (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+        cv2.putText(frame, 'Tracks:%d' % len(cls.ALL), (10, 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
         trk_lst = []
         for trk in cls.ALL:
             if isinstance(trk.id, str):

@@ -1,6 +1,7 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 import numpy as np
+from glob import glob
 
 
 class PoppinParty:
@@ -28,14 +29,47 @@ class PoppinParty:
         self.window.destroy()
 
 
-if __name__ == '__main__':
-    root = tk.Tk()
-    root.attributes('-fullscreen',True)
-    root.bind('<Escape>', lambda *x: root.destroy())
-    root.bind('<Button 1>', lambda event: print(event.x, event.y))
-    canvas = tk.Canvas(root)
-    im = [tk.PhotoImage(Image.open('riQux3XS_400x400.jpg')) for i in range(4)]
+class Main:
+    def __init__(self, agents):
+        self.root = tk.Tk()
+        self.root.attributes('-fullscreen', True)
+        self.root.bind('<Escape>', lambda *x: self.root.destroy())
+        W = self.root.winfo_screenwidth() // 2
+        H = self.root.winfo_screenheight() // 2
+        self.panel_size = W, H
+        self.agents = agents
+        self.panels = {}
+        self.frames = [None] * 2 * 2
+        for i, a in enumerate(agents):
+            row = i // 2
+            clm = i % 2
+            pan = tk.Label(self.root)
+            pan.grid(row=1 + row, column=1 + clm)
 
-    canvas.pack()
-    canvas.create_image(0, 0, image=tk.PhotoImage(image=Image.fromarray(np.random.randint(0, 255, [128, 128, 3], np.uint8))), anchor='nw')
-    root.mainloop()
+            def ctrl(event):
+                x = event.x / W
+                y = event.y / H
+                try:
+                    self.panels[event.widget].control_queue.put([x,y])
+                except KeyError:
+                    print('not supported')
+
+            pan.bind('<Button 1>', ctrl)
+            self.panels[pan] = a
+
+    def __call__(self):
+
+        def refresh():
+            for i, (a, p) in enumerate(zip(self.agents, self.panels)):
+                if not a.display_queue.empty():
+                    img = a.display_queue.get()
+                    im = Image.fromarray(img).resize(self.panel_size)
+                    tkim = ImageTk.PhotoImage(im)
+                    self.frames[i] = tkim
+                    # print(a.frames[i])
+                    p.configure(image=self.frames[i])
+                    p.update()
+            self.root.after(20, refresh)
+
+        refresh()
+        self.root.mainloop()
