@@ -117,11 +117,12 @@ class Agent:
             current_id = 0
 
         self.Track = _Track
-        self.th = Thread(target=self.loop, daemon=True)
+        self.running = True
+        self.th = Thread(target=self.loop)
         self.th.start()
 
     def loop(self):
-        while True:
+        while self.running:
             ret, frame = self.cap.read()
             # frame = cv2.resize(frame, (0, 0), fx=.5, fy=.5)  # down-sampling
 
@@ -146,6 +147,10 @@ class Agent:
             self.display_queue.put(frame[...,::-1])  # give RGB
             self.frame_count += 1
         self._kill_workers()
+
+    def stop(self):
+        self.running = False
+        self.th.join(.1)
 
     def click_handle(self, frame, x, y):
         H, W, _ = frame.shape

@@ -33,7 +33,13 @@ class Main:
     def __init__(self, agents):
         self.root = tk.Tk()
         self.root.attributes('-fullscreen', True)
-        self.root.bind('<Escape>', lambda *x: self.root.destroy())
+
+        def escape():
+            for a in agents:
+                a.stop()
+            self.root.destroy()
+
+        self.root.bind('<Escape>', lambda *x: escape())
         W = self.root.winfo_screenwidth() // 2
         H = self.root.winfo_screenheight() // 2
         self.panel_size = W, H
