@@ -1,0 +1,20 @@
+version: "2.3"
+
+services:
+  search_engine:
+    image: reid
+    container_name: data_server
+    ports:
+      - 6669:6669
+  detector:
+    image: per_det
+    container_name: person_detector
+    runtime: nvidia
+    ports:
+      - 6666:6666
+  feature:
+    image: fea_ext
+    container_name: feature_extraxtor
+    runtime: nvidia
+    ports:
+      - 6667:6667

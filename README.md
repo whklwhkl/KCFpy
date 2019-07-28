@@ -1,32 +1,21 @@
 # KCF tracker in Python
+Intended to be used with other apps to do person re-identification
 
-Python implementation of
-> [High-Speed Tracking with Kernelized Correlation Filters](http://www.robots.ox.ac.uk/~joao/publications/henriques_tpami2015.pdf)<br>
-> J. F. Henriques, R. Caseiro, P. Martins, J. Batista<br>
-> TPAMI 2015
+## prerequisites
+- person detection service, suppose the image's name is `per_det`
+- person feature extraction service, suppose the image's name is `fea_ext`
 
-It is translated from [KCFcpp](https://github.com/joaofaro/KCFcpp) (Authors: Joao Faro, Christian Bailer, Joao F. Henriques), a C++ implementation of Kernelized Correlation Filters. Find more references and code of KCF at http://www.robots.ox.ac.uk/~joao/circulant/
+### ports assumptions:
+  - `per_det`:  6666
+  - `fea_ext`:  6667
+  - `reid`:     6669
 
-### Requirements
-```comandline
-pip install -r requirements.txt
-```
+## setting up
 
-### Use
-Download the sources and execute
-```shell
-git clone https://github.com/uoip/KCFpy.git
-cd KCFpy
-```
+1. `make` to build the data server's docker image `reid`
 
-start `data_server` for data persistence
+2. `docker-compose up -d` launch services
 
-```shell
-python data_server.py
-```
+## run
 
-start `client`, may run multiple copies with different settings
-
-```shell
-python client.py ${CAMERA_ID} # like 0, 1, 2, 3...
-```
+`python demo.py` launch client demo

@@ -19,11 +19,11 @@ os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport:udp"
 INTEVAL = 24    # det every $INTEVAL frames
 
 # HOST = '192.168.1.253'  # 192.168.20.122
-HOST = '192.168.20.122'  # 192.168.20.122
+HOST = '192.168.20.191'  # 192.168.20.122
 
 DET_URL = 'http://%s:6666/det' % HOST
 EXT_URL = 'http://%s:6667/ext' % HOST
-CMP_URL = 'http://%s:6668/{}' % HOST
+CMP_URL = 'http://%s:6669/{}' % HOST
 PAR_URL = 'http://192.168.1.104:1234/par'
 
 ATTRIBUTES = ['Female', 'Front', 'Side', 'Back', 'Hat',

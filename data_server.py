@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify
-from termcolor import colored
 import numpy as np
 
 app = Flask('compare')
@@ -42,4 +41,4 @@ def query():
 
 
 if __name__ == '__main__':
-    app.run('0.0.0.0', 6668, debug=True)
+    app.run('0.0.0.0', 6669, debug=True)
