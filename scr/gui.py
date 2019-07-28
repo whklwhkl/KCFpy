@@ -1,8 +1,11 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 import numpy as np
-from glob import glob
 
+
+class Map:
+    def __init__(self):
+        pass
 
 class PoppinParty:
     def __init__(self):
@@ -62,6 +65,8 @@ class Main:
 
             pan.bind('<Button 1>', ctrl)
             self.panels[pan] = a
+        # todo: draw the map on the cell 2,2
+        # todo: add dnd label to represent position of cameras
 
     def __call__(self):
 
