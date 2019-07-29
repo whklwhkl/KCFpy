@@ -6,6 +6,7 @@ from .abnormal_det import MovingAverage
 from io import BytesIO
 from threading import Thread
 from queue import Queue
+from time import sleep
 
 import numpy as np
 import requests
@@ -15,11 +16,13 @@ import os
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport:udp"
 # from termcolor import colored
 
-
+PAR = False
 INTEVAL = 24    # det every $INTEVAL frames
+REFRESH_INTEVAL = 3
 
+HOST = 'localhost'  # 192.168.20.122
 # HOST = '192.168.1.253'  # 192.168.20.122
-HOST = '192.168.20.191'  # 192.168.20.122
+# HOST = '192.168.20.191'  # 192.168.20.122
 
 DET_URL = 'http://%s:6666/det' % HOST
 EXT_URL = 'http://%s:6667/ext' % HOST
@@ -64,6 +67,12 @@ def query(feature, api_calls):
     return response.json()
 
 
+def reset():
+    print('sending reset request')
+    response = requests.post(CMP_URL.format('reset'), json={})
+    return response.json()
+
+
 def _nd2file(img_nd):
     return BytesIO(cv2.imencode('.jpg', img_nd)[1])
 
@@ -92,13 +101,18 @@ class Agent:
     display_queue: rendered images as output
     control_queue: (x, y) coordinate pairs as input
     """
+
     def __init__(self, source):
-        self.source = source
         try:
             source = int(source)
         except ValueError:
             pass
+        self.source = source
         self.cap = cv2.VideoCapture(source)
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        self.cap.set(cv2.CAP_PROP_FPS, 24)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 704)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         self.display_queue = Queue(32)
         self.control_queue = Queue(1)
         self.q_reg = Queue(32)  # register queue
@@ -123,11 +137,16 @@ class Agent:
 
     def loop(self):
         while self.running:
+            # sleep(0.04)
             ret, frame = self.cap.read()
-            # frame = cv2.resize(frame, (0, 0), fx=.5, fy=.5)  # down-sampling
+            # ret, frame = self.cap.read()
+            # ret, frame = self.cap.read()
 
             if not ret or frame is None:
-                break
+                self.cap = cv2.VideoCapture(self.source)
+                # print('renewed', self.source)
+                continue
+            frame = cv2.resize(frame, (0, 0), fx=.5, fy=.5)  # down-sampling
             frame_ = frame.copy()
             self.Track.step(frame_)
             if self.frame_count % INTEVAL == 0:
@@ -135,9 +154,10 @@ class Agent:
                 self.Track.decay()
             self._post_det_procedure()
             self._post_ext_procedure()
-            self._post_cmp_procedure()
+            self._post_cmp_procedure(frame_)
             self._post_reg_procedure()
-            self._post_par_procedure()
+            if PAR:
+                self._post_par_procedure()
             if not self.control_queue.empty():
                 x, y = self.control_queue.get()
                 self.click_handle(frame_, x, y)
@@ -163,9 +183,6 @@ class Agent:
                 def work():
                     img_roi = _crop(frame, trk.box)
                     trk.feature = ext(_nd2file(img_roi), self.api_calls)
-                    # entry = Entry()
-                    # entry.show()
-                    # up(entry.content, trk.feature)
                     up(str(trk.id), trk.feature, self.api_calls)
                     self.q_reg.put(1)
 
@@ -181,11 +198,13 @@ class Agent:
                 boxes = _cvt_ltrb2ltwh(boxes)
                 self.Track.update(frame_, boxes)
                 for t in self.Track.ALL:
-                    if t.visible and t.feature is None or t.distorted:
-                        if t.distorted:
-                            self.api_calls['refresh'] += 1
-                        img_roi = _crop(frame_, t.box)
-                        self.w_ext.put(t, img_roi)
+                    if t.visible:
+                        if isinstance(t.id, int):
+                            if t.age % REFRESH_INTEVAL == 0:
+                                if t.age // REFRESH_INTEVAL:
+                                    self.api_calls['refresh'] += 1
+                                img_roi = _crop(frame_, t.box)
+                                self.w_ext.put(t, img_roi)
             else:
                 for t in self.Track.ALL:
                     t.visible = False
@@ -197,31 +216,30 @@ class Agent:
             t.feature = feature
             self.w_cmp.put(t, feature)
 
-    def _post_cmp_procedure(self):
+    def _post_cmp_procedure(self, frame_):
         if not self.w_cmp.p.empty():
             t, ret = self.w_cmp.get()
             i = ret.get('id')
+            # assert isinstance(i, str)
             c = colors[ret.get('idx')]
             if i is not None and i != -1:
                 t.similarity = ret.get('similarity')
-
-                if i not in self.matches:
-                    self.matches[i] = t
-                    self.sim_ema[i] = MovingAverage(t.similarity, conf_band=2)
-                    t.color = c
-                    t.id = i
-                    self.matches[i] = t
-                    # self.w_par.put(t, _crop(frame_, t.box))
-                else:
-                    if t.similarity > self.sim_ema[i].x and \
-                            self.sim_ema[i](t.similarity):
+                sim_ema = self.sim_ema.setdefault(i, MovingAverage(
+                    t.similarity, conf_band=2.5))
+                if PAR:
+                    self.w_par.put(t, _crop(frame_, t.box))
+                if sim_ema(t.similarity):
+                    if i in self.matches:
                         f = self.matches[i]
-                        f.color = Track.color
-                        f.id = int(f.id)
-                        f.similarity = 0
-                        t.color = c
-                        t.id = i
+                        if t > f:
+                            f.color = Track.color
+                            f.id = int(f.id)
+                            f.similarity = 0
+                            self.matches[i] = t
+                    else:
                         self.matches[i] = t
+                    self.matches[i].color = c
+                    self.matches[i].id = i
 
     def _post_reg_procedure(self):
         if not self.q_reg.empty():
@@ -232,7 +250,7 @@ class Agent:
 
     def _post_par_procedure(self):
         if not self.w_par.p.empty():
-            # t, att = self.w_par.get()            # person attributes
+            t, att = self.w_par.get()            # person attributes
             setattr(t, 'par', att)
 
     def _render(self, frame):

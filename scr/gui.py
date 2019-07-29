@@ -1,5 +1,7 @@
 from .drag_n_drop import DragDropRectangle as DDR
+from .agent import reset
 
+import time
 import tkinter as tk
 from PIL import Image, ImageTk
 import numpy as np
@@ -52,6 +54,13 @@ class Main:
         self.agents = agents
         self.panels = {}
         self.frames = [None] * 2 * 2
+
+        def _reset():
+            for a in agents:
+                a.Track.ALL = set()
+            reset()
+
+        self.root.bind('<Delete>', lambda *x: _reset())
         for i, a in enumerate(agents):
             row = i // 2
             clm = i % 2
@@ -99,9 +108,9 @@ class Main:
                     tracks += [track_map]
                 # common_track = {i:[t[i] for t in tracks] for i in common_id}
                 common_track = None
-                print(common_track)
+                # print(common_track)
                 self.map_gui(common_track)
-            self.root.after(20, refresh)
+            self.root.after(10, refresh)
 
         refresh()
         self.root.mainloop()

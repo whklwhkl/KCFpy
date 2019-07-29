@@ -40,5 +40,14 @@ def query():
     return jsonify({'id': ret, 'idx': hash(ret) % 256, 'similarity': similarity})
 
 
+@app.route('/reset', methods=['POST'])
+def reset():
+    global DATASET
+    DATASET = {}
+    request.get_json()
+    print(len(DATASET), 'saved identities')
+    return jsonify(len(DATASET))
+
+
 if __name__ == '__main__':
     app.run('0.0.0.0', 6669, debug=True)

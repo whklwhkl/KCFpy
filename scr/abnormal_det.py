@@ -9,7 +9,7 @@ class MovingAverage:
 
     def __call__(self, val):
         std = max(1e-5, self.x2 - self.x ** 2) ** .5
-        err = abs(val - self.x)
+        err = (val - self.x)
         self.x = self.m * self.x + self.m_ * val
         self.x2 = self.m * self.x2 + self.m_ * val ** 2
         return err > self.k * std   # True for abnormal

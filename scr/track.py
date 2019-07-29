@@ -3,6 +3,7 @@ from .kcftracker import KCFTracker
 
 import cv2
 import numpy as np
+from random import random
 
 
 
@@ -10,7 +11,6 @@ class Track:
     # DEFAULT
     age = 0     # age < PROBATION means is_candidate
     color = (128, 128, 128)  # gray
-    distorted = False
     current_id = 0
     health = 2  # positive means visible
     is_occluded = False
@@ -89,10 +89,6 @@ class Track:
                     det_idx = np.argmax(iou_det)
                     box = det_boxes[det_idx]
                     t.tracker.init(box, frame)
-                    if iou_det[det_idx] < .8:
-                        t.distorted = True
-                    else:
-                        t.distorted = False
                     t.box = box
                     t.visible = True
                 else:
