@@ -1,18 +1,31 @@
 import tkinter as tk
 
 
-class DragDrop:
-    def __init__(self, widget:tk.Label):
-        widget.bind("<ButtonPress-1>", self.on_start)
-        widget.bind("<B1-Motion>", self.on_drag)
-        widget.bind("<ButtonRelease-1>", self.on_drop)
-        widget.configure(cursor="hand1")
+class DragDropRectangle:
+    def __init__(self, canvas, left, top, right, bottom, color):
+        self.canvas = canvas
+        self.xpos, self.ypos = left, top
+        self.mouse_xpos = None
+        self.mouse_ypos = None
+        self.obj = canvas.create_rectangle(left, top, right, bottom, fill=color)
 
-    def on_start(self):
-        pass
+        canvas.tag_bind(self.obj, '<Button1-Motion>', self.move)
+        canvas.tag_bind(self.obj, '<ButtonRelease-1>', self.release)
+        self.move_flag = False
 
-    def on_drag(self):
-        pass
+    def move(self, event):
+        if self.move_flag:
+            new_xpos, new_ypos = event.x, event.y
+            self.canvas.move(self.obj,
+                new_xpos-self.mouse_xpos ,new_ypos-self.mouse_ypos)
 
-    def on_drop(self):
-        pass
+            self.mouse_xpos = new_xpos
+            self.mouse_ypos = new_ypos
+        else:
+            self.move_flag = True
+            self.canvas.tag_raise(self.obj)
+            self.mouse_xpos = event.x
+            self.mouse_ypos = event.y
+
+    def release(self, event):
+        self.move_flag = False

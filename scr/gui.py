@@ -1,35 +1,38 @@
+from .drag_n_drop import DragDropRectangle as DDR
+
 import tkinter as tk
 from PIL import Image, ImageTk
 import numpy as np
 
 
 class Map:
-    def __init__(self):
+
+    def __init__(self, master, W, H):
+        canv = tk.Canvas(master, width=W, height=H)
+        canv.grid(row=2, column=2)
+        im = Image.open('assets/demo_map_1.jpg').resize([W, H])
+        self.tkim = ImageTk.PhotoImage(im)
+        canv.create_image(0, 0, anchor='nw', image=self.tkim)
+        self.canv = canv
+        self.camera_icons = [None] * 3
+        self.camera_icons[0] = DDR(canv, 100, 100, 120, 120, 'red')
+        self.camera_icons[1] = DDR(canv, 200, 200, 220, 220, 'green')
+        self.camera_icons[2] = DDR(canv, 300, 300, 320, 320, 'blue')
+
+    def __call__(self, tracks):
+        # find common id in 3 Tracks
+        # infer each id's position
         pass
 
-class PoppinParty:
-    def __init__(self):
-        self.window = tk.Tk()
-        self.label = tk.Label(self.window, text='name:')
-        self.label.pack()
-        self.entry = tk.Entry(self.window)
-        self.entry.pack()
-        self.content = None
+    def _get_coordinate(self, distances):
+        pass
 
-        def set_name():
-            self.content = self.entry.get()
-            self.destroy()
-
-        self.buttonY = tk.Button(self.window, text='confirm', command=set_name)
-        self.buttonY.pack()
-        self.buttonN = tk.Button(self.window, text='cancle', command=self.destroy)
-        self.buttonN.pack()
-
-    def show(self):
-        target = self.window.mainloop()
-
-    def destroy(self):
-        self.window.destroy()
+    def _get_cam_position(self):
+        xys = []
+        for cam in self.camera_icons:
+            l, t, r, b = self.canv.coords(cam.obj)
+            xys += [((l+r)/2, (t+b)/2)]
+        return xys
 
 
 class Main:
@@ -66,6 +69,9 @@ class Main:
             pan.bind('<Button 1>', ctrl)
             self.panels[pan] = a
         # todo: draw the map on the cell 2,2
+        if len(agents) == 3:
+            self.map_gui = Map(self.root, W, H)
+
         # todo: add dnd label to represent position of cameras
 
     def __call__(self):
@@ -80,6 +86,21 @@ class Main:
                     # print(a.frames[i])
                     p.configure(image=self.frames[i])
                     p.update()
+            if len(self.agents) == 3:
+                # process tracks
+                tracks = []
+                common_id = set()
+                for a in self.agents:
+                    track_map = {}
+                    for t in a.Track.ALL:
+                        if isinstance(t.id, str):
+                            track_map[t.id] = t
+                            common_id.add(t.id)
+                    tracks += [track_map]
+                # common_track = {i:[t[i] for t in tracks] for i in common_id}
+                common_track = None
+                print(common_track)
+                self.map_gui(common_track)
             self.root.after(20, refresh)
 
         refresh()
