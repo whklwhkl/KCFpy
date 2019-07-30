@@ -18,3 +18,9 @@ services:
     runtime: nvidia
     ports:
       - 6667:6667
+  person_attribute:
+    image: par
+    container_name: par
+    runtime: nvidia
+    ports:
+      - 6668:6668

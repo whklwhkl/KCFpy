@@ -16,8 +16,8 @@ import os
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport:udp"
 # from termcolor import colored
 
-PAR = False
-INTEVAL = 24    # det every $INTEVAL frames
+PAR = True
+INTEVAL = 12    # det every $INTEVAL frames
 REFRESH_INTEVAL = 3
 
 HOST = 'localhost'  # 192.168.20.122
@@ -26,8 +26,8 @@ HOST = 'localhost'  # 192.168.20.122
 
 DET_URL = 'http://%s:6666/det' % HOST
 EXT_URL = 'http://%s:6667/ext' % HOST
+PAR_URL = 'http://%s:6668/par' % HOST
 CMP_URL = 'http://%s:6669/{}' % HOST
-PAR_URL = 'http://192.168.1.104:1234/par'
 
 ATTRIBUTES = ['Female', 'Front', 'Side', 'Back', 'Hat',
               'Glasses', 'Hand Bag', 'Shoulder Bag', 'Backpack',
@@ -50,7 +50,8 @@ def ext(img_file, api_calls):
 def par(img_file, api_calls):
     api_calls['attributes'] += 1
     response = requests.post(PAR_URL, files={'img': img_file})
-    return np.fromstring(response.json()['predictions'], dtype=np.uint8)
+    # print(response)
+    return np.array(response.json()['predictions'], dtype=np.uint8)
 
 
 def up(identity, feature, api_calls):
@@ -70,6 +71,11 @@ def query(feature, api_calls):
 def reset():
     print('sending reset request')
     response = requests.post(CMP_URL.format('reset'), json={})
+    return response.json()
+
+
+def save():
+    response = requests.post(CMP_URL.format('save'), json={})
     return response.json()
 
 
@@ -110,7 +116,7 @@ class Agent:
         self.source = source
         self.cap = cv2.VideoCapture(source)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        self.cap.set(cv2.CAP_PROP_FPS, 24)
+        self.cap.set(cv2.CAP_PROP_FPS, 12)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 704)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         self.display_queue = Queue(32)
@@ -124,7 +130,7 @@ class Agent:
         self.w_cmp = Worker(lambda i, x: (i, query(x, self.api_calls)))
         self.w_par = Worker(lambda i, x: (i, par(_nd2file(x), self.api_calls)))
         self.matches = {}
-        self.sim_ema = {}
+        # self.sim_ema = {}
 
         class _Track(Track):
             ALL = set()
@@ -132,12 +138,15 @@ class Agent:
 
         self.Track = _Track
         self.running = True
+        self.suspend = False
         self.th = Thread(target=self.loop)
         self.th.start()
 
     def loop(self):
         while self.running:
-            # sleep(0.04)
+            # sleep(0.1)
+            if self.suspend == True:
+                sleep(0.5)
             ret, frame = self.cap.read()
             # ret, frame = self.cap.read()
             # ret, frame = self.cap.read()
@@ -184,6 +193,7 @@ class Agent:
                     img_roi = _crop(frame, trk.box)
                     trk.feature = ext(_nd2file(img_roi), self.api_calls)
                     up(str(trk.id), trk.feature, self.api_calls)
+                    # np.save('{}'.format(trk.id), np.array(trk.feature))
                     self.q_reg.put(1)
 
                 th = Thread(target=work)
@@ -224,11 +234,12 @@ class Agent:
             c = colors[ret.get('idx')]
             if i is not None and i != -1:
                 t.similarity = ret.get('similarity')
-                sim_ema = self.sim_ema.setdefault(i, MovingAverage(
-                    t.similarity, conf_band=2.5))
+                # sim_ema = self.sim_ema.setdefault(i, MovingAverage(
+                #     t.similarity, conf_band=2.5))
                 if PAR:
                     self.w_par.put(t, _crop(frame_, t.box))
-                if sim_ema(t.similarity):
+                if t.similarity > .94:
+                # if sim_ema(t.similarity):
                     if i in self.matches:
                         f = self.matches[i]
                         if t > f:
@@ -265,7 +276,7 @@ class Agent:
                         m = True
                     if m:
                         cv2.putText(frame, a, (x + w + 3, y),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 2.0, t.color, 3)
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, t.color, 2)
                         y += h//8
         for i, kv in enumerate(self.api_calls.items()):
             cv2.putText(frame, '{:<10}'.format(kv[0]), (10, i*20 + 60),

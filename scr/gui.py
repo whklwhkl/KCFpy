@@ -1,5 +1,5 @@
 from .drag_n_drop import DragDropRectangle as DDR
-from .agent import reset
+from .agent import reset, save
 
 import time
 import tkinter as tk
@@ -61,6 +61,13 @@ class Main:
             reset()
 
         self.root.bind('<Delete>', lambda *x: _reset())
+        self.root.bind('<Enter>', lambda *x: save())
+
+        def toggle_suspend():
+            for a in agents:
+                a.suspend = not a.suspend
+
+        self.root.bind('<space>', lambda *x: toggle_suspend())
         for i, a in enumerate(agents):
             row = i // 2
             clm = i % 2

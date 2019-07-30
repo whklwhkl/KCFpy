@@ -7,6 +7,7 @@ RUN pip install --upgrade pip \
 WORKDIR /app
 
 COPY ./data_server.py .
+COPY ./assets/dataset.pkl .
 
 EXPOSE 6669
 

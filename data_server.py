@@ -1,10 +1,13 @@
 from flask import Flask, request, jsonify
 import numpy as np
+import pickle
+
 
 app = Flask('compare')
 
 
 DATASET = {}
+DATASET = pickle.load(open('dataset.pkl', 'rb'))
 
 
 @app.route('/update', methods=['POST'])
@@ -43,10 +46,21 @@ def query():
 @app.route('/reset', methods=['POST'])
 def reset():
     global DATASET
+    # try:
+    #     DATASET = pickle.load(open('dataset.pkl', 'rb'))
+    # except:
     DATASET = {}
     request.get_json()
     print(len(DATASET), 'saved identities')
     return jsonify(len(DATASET))
+
+
+@app.route('/save', methods=['POST'])
+def save():
+    global DATASET
+    # pickle.dump(DATASET, open('dataset.pkl', 'wb'))
+    DATASET = pickle.load(open('dataset.pkl', 'rb'))
+    return jsonify('saved')
 
 
 if __name__ == '__main__':
