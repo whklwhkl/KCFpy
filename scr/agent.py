@@ -49,6 +49,7 @@ def ext(img_file, api_calls):
 
 def par(img_file, api_calls):
     api_calls['attributes'] += 1
+    # print(img_file)
     response = requests.post(PAR_URL, files={'img': img_file})
     # print(response)
     return np.array(response.json()['predictions'], dtype=np.uint8)
