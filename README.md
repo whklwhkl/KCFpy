@@ -21,3 +21,15 @@ If we do not have the services ready, we can launch them on the local host.
 ## run
 
 `python demo.py` launch client demo
+
+# Collect tracked objects from Videos
+
+```bash
+PYTHONPATH=. python scripts/parse_video.py \
+  -v ${YOUR_VIDEO_PATH} \
+  -i ${IP_ADDRESS_OF_DETECTION_SERVICE} \
+  -p ${PORT_OF_DETECTION_SERVICE} \
+  -f ${DETECTION_PERIOD} \
+  -o ${OUTPUT_FOLDER} \
+  -s #[optional] play video wile parsing
+```
