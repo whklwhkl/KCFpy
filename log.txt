@@ -1,0 +1,13 @@
+/home/wanghao/datasets/ReID现场测试视频/三人同行视频片段/094惠盛路盛岸一村67号东2_154330~154430.mp4
+/home/wanghao/datasets/ReID现场测试视频/三人同行视频片段/086盛岸一村2号路西1_155300~155430.mp4
+/home/wanghao/datasets/ReID现场测试视频/三人同行视频片段/103老盛岸路-盛岸一村97号北154030~154130.mp4
+/home/wanghao/datasets/ReID现场测试视频/三人同行视频片段/087盛岸一村2号西2_154500~154600.mp4
+/home/wanghao/datasets/ReID现场测试视频/三人同行视频片段/115盛岸路东凤翔南路_160700~160900.mp4
+/home/wanghao/datasets/ReID现场测试视频/三人同行视频片段/094惠盛路盛岸一村67号东2_155620~155700.mp4
+/home/wanghao/datasets/ReID现场测试视频/三人同行视频片段/110盛岸一村121号东门卫_160000~160100.mp4
+/home/wanghao/datasets/ReID现场测试视频/三人同行视频片段/075通盛路盛岸一村1-6号门1_155130~155200.mp4
+/home/wanghao/datasets/ReID现场测试视频/三人同行视频片段/075通盛路盛岸一村1-6号门1_154830~154930.mp4
+/home/wanghao/datasets/ReID现场测试视频/三人同行视频片段/079盛岸一村71号北_154100~154210.mp4
+/home/wanghao/datasets/ReID现场测试视频/三人同行视频片段/079盛岸一村71号北_160530~160630.mp4
+/home/wanghao/datasets/ReID现场测试视频/三人同行视频片段/115盛岸路东凤翔南路_154000~154100.mp4
+/home/wanghao/datasets/ReID现场测试视频/三人同行视频片段/076通盛路盛岸一村1市号门2_154730~154830.mp4

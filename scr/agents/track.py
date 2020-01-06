@@ -20,7 +20,7 @@ class Track:
     velocity = np.zeros([4])
     # STATIC
     ALL = set()
-    BIRTH_IOU = .5
+    BIRTH_IOU = .25
     CANDIDATE_IOU = .75
     OCCLUSION_IOU = .65
     PROBATION = 2
@@ -52,7 +52,8 @@ class Track:
             self.visible = False
 
     def step0(self):
-        self.box += self.velocity * np.array([1, 1, 0, 0])
+        pass
+        # self.box += self.velocity * np.array([1, 1, 0, 0])
         # self.health -= 1
 
     def is_valid(self):

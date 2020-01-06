@@ -17,7 +17,7 @@ class Worker:
                 except Exception:
                     continue
 
-        self.th = Thread(target=loop, daemon=True)
+        self.th = Thread(target=loop)
         self.th.start()
 
     def has_feedback(self):
