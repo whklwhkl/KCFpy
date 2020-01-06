@@ -20,64 +20,13 @@ PAR = True
 INTEVAL = 12    # det every $INTEVAL frames
 REFRESH_INTEVAL = 3
 
-HOST = 'localhost'  # 192.168.20.122
-# HOST = '192.168.1.253'  # 192.168.20.122
-# HOST = '192.168.20.191'  # 192.168.20.122
-
-DET_URL = 'http://%s:6666/det' % HOST
-EXT_URL = 'http://%s:6667/ext' % HOST
-PAR_URL = 'http://%s:6668/par' % HOST
-CMP_URL = 'http://%s:6669/{}' % HOST
-
 ATTRIBUTES = ['Female', 'Front', 'Side', 'Back', 'Hat',
               'Glasses', 'Hand Bag', 'Shoulder Bag', 'Backpack',
               'Hold Objects in Front', 'Short Sleeve', 'Long Sleeve',
               'Long Coat', 'Trousers', 'Skirt & Dress']
 
 
-def det(img_file, api_calls):
-    api_calls['detection'] += 1
-    response = requests.post(DET_URL, files={'img': img_file})
-    return response.json()
 
-
-def ext(img_file, api_calls):
-    api_calls['feature'] += 1
-    response = requests.post(EXT_URL, files={'img': img_file})
-    return response.json()
-
-
-def par(img_file, api_calls):
-    api_calls['attributes'] += 1
-    # print(img_file)
-    response = requests.post(PAR_URL, files={'img': img_file})
-    # print(response)
-    return np.array(response.json()['predictions'], dtype=np.uint8)
-
-
-def up(identity, feature, api_calls):
-    api_calls['register'] += 1
-    response = requests.post(CMP_URL.format('update'),
-                             json={'id': identity, 'feature': feature})
-    response.json()
-
-
-def query(feature, api_calls):
-    api_calls['query'] += 1
-    response = requests.post(CMP_URL.format('query'),
-                             json={'id': '', 'feature': feature})
-    return response.json()
-
-
-def reset():
-    print('sending reset request')
-    response = requests.post(CMP_URL.format('reset'), json={})
-    return response.json()
-
-
-def save():
-    response = requests.post(CMP_URL.format('save'), json={})
-    return response.json()
 
 
 def _nd2file(img_nd):
@@ -85,7 +34,10 @@ def _nd2file(img_nd):
 
 
 def _cvt_ltrb2ltwh(boxes):
-    boxes = np.array(boxes)
+    boxes_ = []
+    for b in boxes['dets']:
+        boxes_.append(b['x1y1x2y2'])
+    boxes = np.array(boxes_)
     boxes[:, 2: 4] -= boxes[:, :2]
     return boxes[:, :4]
 
@@ -98,7 +50,7 @@ def _crop(frame, trk_box):
     r = min(left + w, W)
     b = min(t + h, H)
     crop = frame[t: b, left: r, :]
-    return cv2.resize(crop, (128, 384))
+    return cv2.resize(crop, (128, 256))
 
 
 class Agent:
@@ -109,23 +61,64 @@ class Agent:
     control_queue: (x, y) coordinate pairs as input
     """
 
-    def __init__(self, source):
+    def __init__(self, source, host='localhost'):
         try:
             source = int(source)
         except ValueError:
             pass
-        self.source = source
-        self.cap = cv2.VideoCapture(source)
+        self.source = os.path.expanduser(source)
+        self.cap = cv2.VideoCapture(self.source)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.cap.set(cv2.CAP_PROP_FPS, 12)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 704)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        # self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 704)
+        # self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         self.display_queue = Queue(32)
         self.control_queue = Queue(1)
         self.q_reg = Queue(32)  # register queue
         self.frame_count = 0
         self.api_calls = {k: 0 for k in ['register', 'detection', 'feature',
                                          'query', 'refresh', 'attributes']}
+        # HOST = '192.168.1.100'  # 192.168.20.122
+        # HOST = '192.168.1.253'  # 192.168.20.122
+        # HOST = '192.168.20.191'  # 192.168.20.122
+
+        DET_URL = 'http://%s:6666/det' % host
+        EXT_URL = 'http://%s:6667/ext' % host
+        PAR_URL = 'http://%s:6668/par' % host
+        CMP_URL = 'http://%s:6669/{}' % host
+
+        def det(img_file, api_calls):
+            api_calls['detection'] += 1
+            response = requests.post(DET_URL, files={'img': img_file})
+            return response.json()
+
+        def ext(img_file, api_calls):
+            api_calls['feature'] += 1
+            response = requests.post(EXT_URL, files={'img': img_file})
+            return response.json()
+
+        def par(img_file, api_calls):
+            api_calls['attributes'] += 1
+            # print(img_file)
+            response = requests.post(PAR_URL, files={'img': img_file})
+            # print(response)
+            return np.array(response.json()['predictions'], dtype=np.uint8)
+
+        def up(identity, feature, api_calls):
+            api_calls['register'] += 1
+            response = requests.post(CMP_URL.format('update'),
+                                     json={'id': identity, 'feature': feature})
+            response.json()
+
+        def query(feature, api_calls):
+            api_calls['query'] += 1
+            response = requests.post(CMP_URL.format('query'),
+                                     json={'id': '', 'feature': feature})
+            return response.json()
+
+        self.CMP_URL = CMP_URL
+        self.ext = ext
+        self.up = up
         self.w_det = Worker(lambda x: (x, det(_nd2file(x), self.api_calls)))
         self.w_ext = Worker(lambda i, x: (i, ext(_nd2file(x), self.api_calls)))
         self.w_cmp = Worker(lambda i, x: (i, query(x, self.api_calls)))
@@ -156,7 +149,7 @@ class Agent:
                 self.cap = cv2.VideoCapture(self.source)
                 # print('renewed', self.source)
                 continue
-            frame = cv2.resize(frame, (0, 0), fx=.5, fy=.5)  # down-sampling
+            # frame = cv2.resize(frame, (0, 0), fx=.5, fy=.5)  # down-sampling
             frame_ = frame.copy()
             self.Track.step(frame_)
             if self.frame_count % INTEVAL == 0:
@@ -178,6 +171,15 @@ class Agent:
             self.frame_count += 1
         self._kill_workers()
 
+    def reset(self):
+        print('sending reset request')
+        response = requests.post(self.CMP_URL.format('reset'), json={})
+        return response.json()
+
+    def save(self):
+        response = requests.post(self.CMP_URL.format('save'), json={})
+        return response.json()
+
     def stop(self):
         self.running = False
         self.th.join(.1)
@@ -192,9 +194,8 @@ class Agent:
             if l < x < l + w and t < y < t + h:
                 def work():
                     img_roi = _crop(frame, trk.box)
-                    trk.feature = ext(_nd2file(img_roi), self.api_calls)
-                    up(str(trk.id), trk.feature, self.api_calls)
-                    # np.save('{}'.format(trk.id), np.array(trk.feature))
+                    trk.feature = self.ext(_nd2file(img_roi), self.api_calls)
+                    self.up(str(trk.id), trk.feature, self.api_calls)
                     self.q_reg.put(1)
 
                 th = Thread(target=work)

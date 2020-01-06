@@ -1,5 +1,4 @@
 from .drag_n_drop import DragDropRectangle as DDR
-from .agent import reset, save
 
 import time
 import tkinter as tk
@@ -48,7 +47,7 @@ class Main:
             self.root.destroy()
 
         self.root.bind('<Escape>', lambda *x: escape())
-        W = self.root.winfo_screenwidth() // 2
+        W = self.root.winfo_screenwidth() // 4
         H = self.root.winfo_screenheight() // 2
         self.panel_size = W, H
         self.agents = agents
@@ -56,12 +55,23 @@ class Main:
         self.frames = [None] * 2 * 2
 
         def _reset():
+            reset = False
             for a in agents:
                 a.Track.ALL = set()
-            reset()
+                if not reset:
+                    a.reset()
+                    reset = True
+
+        def _save():
+            save = False
+            for a in agents:
+                a.Track.ALL = set()
+                if not save:
+                    a.save()
+                    save = True
 
         self.root.bind('<Delete>', lambda *x: _reset())
-        self.root.bind('<Enter>', lambda *x: save())
+        self.root.bind('<Enter>', lambda *x: _save())
 
         def toggle_suspend():
             for a in agents:

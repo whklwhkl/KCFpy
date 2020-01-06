@@ -69,4 +69,4 @@ while True:
         cv2.imshow('foo', frame)
         if cv2.waitKey(1)==27:
             break
-    print('\033[F'+str(count), 'frames', 'processed')
+    print('\033[F'+str(count), 'frames', 'processed', '#trackers:', len(Track.ALL))

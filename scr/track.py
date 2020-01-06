@@ -4,7 +4,7 @@ from .kcftracker import KCFTracker
 import cv2
 import numpy as np
 from random import random
-
+from time import time
 
 
 class Track:
@@ -35,6 +35,7 @@ class Track:
         self.id = type(self).current_id
         type(self).ALL.add(self)
         type(self).current_id += 1
+        self.time = self.time0 = time()
 
     def step1(self, frame):
         new_box = self.tracker.update(frame)
@@ -68,7 +69,8 @@ class Track:
             cv2.putText(frame, t, (x, y), font, size, self.color, thickness)
 
         text('HP:%d' % self.health, l, t - 3, .6)
-        text('LV:%d' % self.age, l + 3, b - 3, .6)
+        text('stay:%d' % int(self.time - self.time0), l + 3, b - 3, .6)
+        # text('LV:%d' % self.age, l + 3, b - 3, .6)
         text(self.id if isinstance(self.id, str) else '?', r, t, 2.0, 4)
         text('{:.2f}'.format(self.similarity), r, b, .6)
 
@@ -84,6 +86,7 @@ class Track:
             for iou_det, m, t in zip(iou_mtx, match_trk, tracks):
                 if m:
                     t.age += 1
+                    t.time = time()
                     t.health = cls.health
                     t.tracker = KCFTracker(False, True, True)
                     det_idx = np.argmax(iou_det)
