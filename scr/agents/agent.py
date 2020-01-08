@@ -83,8 +83,6 @@ class Agent:
 
         self.w_det = Worker(lambda x: (x, det(_nd2file(x), self.api_calls)))
         self.workers = [self.w_det]
-        self.matches = {}
-        # self.sim_ema = {}
 
         class _Track(Track):
             ALL = set()
@@ -94,7 +92,7 @@ class Agent:
         self.running = True
         self.suspend = False
         self.on_det_funcs = []
-        self.th = Thread(target=self.loop)
+        self.th = Thread(target=self.loop, daemon=True)
         self.th.start()
 
     def loop(self):
@@ -132,7 +130,7 @@ class Agent:
 
     def save(self):
         pass
-    
+
     def stop(self):
         self.running = False
         self.th.join(.1)
@@ -176,23 +174,10 @@ class Agent:
                     t.health -= 1 if t.age > self.Track.PROBATION else 9999
 
     def on_new_det(self, t:Track, img_roi):
-        for f in self.on_det_funcs:
-            f(t, img_roi)
+        return
 
     def _render(self, frame):
         self.Track.render(frame)
-        for t in self.Track.ALL:
-            if hasattr(t, 'par') and t.visible:
-                x, y, w, h = map(int, t.box)
-                y += h//4
-                for a, m in zip(ATTRIBUTES, t.par):
-                    if a == 'Female' and not m:
-                        a = 'Male'
-                        m = True
-                    if m:
-                        cv2.putText(frame, a, (x + w + 3, y),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, t.color, 2)
-                        y += h//8
         for i, kv in enumerate(self.api_calls.items()):
             cv2.putText(frame, '{:<10}'.format(kv[0]), (10, i*20 + 60),
                         cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 0, 0), 1)

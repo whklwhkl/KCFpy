@@ -35,7 +35,6 @@ class Track:
         self.id = type(self).current_id
         type(self).ALL.add(self)
         type(self).current_id += 1
-        self.time = self.time0 = time()
 
     def step1(self, frame):
         new_box = self.tracker.update(frame)
@@ -64,19 +63,18 @@ class Track:
         r = l + w
         b = t + h
         cv2.rectangle(frame, (l, t), (r, b), self.color, 2)
-
-        def text(t, x, y, size=.9, thickness=2):
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            cv2.putText(frame, t, (x, y), font, size, self.color, thickness)
-
-        text('HP:%d' % self.health, l, t - 3, .6)
-        text('stay:%d' % int(self.time - self.time0), l + 3, b - 3, .6)
+        # text('stay:%d' % int(self.time - self.time0), l + 3, b - 3, .6)
+        self.text(frame, 'HP:%d' % self.health, l, t - 3, .6)
         # text('LV:%d' % self.age, l + 3, b - 3, .6)
-        text(self.id if isinstance(self.id, str) else '?', r, t, 2.0, 4)
-        text('{:.2f}'.format(self.similarity), r, b, .6)
+        self.text(frame, self.id if isinstance(self.id, str) else '?', r, t, 2.0, 4)
+        self.text(frame, '{:.2f}'.format(self.similarity), r, b, .6)
 
     def __gt__(self, other):
         return self.similarity > other.similarity
+
+    def text(self, frame, t, x, y, size=.9, thickness=2):
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        cv2.putText(frame, t, (x, y), font, size, self.color, thickness)
 
     @classmethod
     def update(cls, frame, det_boxes):
