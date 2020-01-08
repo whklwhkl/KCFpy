@@ -9,6 +9,7 @@ ATTRIBUTES = ['Female', 'Front', 'Side', 'Back', 'Hat',
               'Hold Objects in Front', 'Short Sleeve', 'Long Sleeve',
               'Long Coat', 'Trousers', 'Skirt & Dress']
 SIMILARITY_THRESHOLD = .8
+DISTANCE_THRESHOLD = 200
 FEATURE_MOMENTUM = .9
 
 
@@ -17,10 +18,11 @@ def make_object_type():
 
         current_id = 0
 
-        def __init__(self, feature):
+        def __init__(self, feature, box):
             cls = type(self)
             self.id = str(cls.current_id)
             self.feature = feature
+            self.box = box
             self.first_seen = self.last_seen = time()
             self.imgs = []
             cls.current_id += 1
@@ -31,6 +33,14 @@ def make_object_type():
         @staticmethod
         def is_overstay(seconds):
             return seconds > 30
+
+        @staticmethod
+        def is_alike(similarity):
+            return similarity > SIMILARITY_THRESHOLD
+
+        @staticmethod
+        def is_far(delta):
+            return delta > DISTANCE_THRESHOLD
     return Person
 
 
@@ -75,28 +85,34 @@ def cut(img, bbox):
 
 class Storage:
 
-    def __init__(self, object_type , memory=30):
+    def __init__(self, object_type, memory=30):
         self.id_map = {}
         self.memory = memory
         self.frames = []
         self.object_type = object_type
 
-    def add(self, feature):
-        p = self.object_type(feature)
+    def add(self, feature, box):
+        p = self.object_type(feature, box)
         self.id_map[p.id] = p
 
-    def reg(self, feature):
+    def reg(self, feature, box):
         feature = np.array(feature, np.float32)
         if len(self.id_map):
             q = self.query(feature)
-            if q['similarity'] > SIMILARITY_THRESHOLD:
-                id = q['id']
-                p = self.id_map[id]
+            p = self.id_map[q['id']]
+            if self.object_type.is_far(abs(box - p.box).sum()):
+                # diff
+                # print('new', abs(box - p.box).sum())
+                self.add(feature, box)
+            elif self.object_type.is_alike(q['similarity']):
+                # same
                 p.feature = p.feature * FEATURE_MOMENTUM + feature * (1-FEATURE_MOMENTUM)
+                p.box = p.box * FEATURE_MOMENTUM + box * (1-FEATURE_MOMENTUM)
             else:
-                self.add(feature)
+                # occlusion
+                pass # ignore
         else:
-            self.add(feature)
+            self.add(feature, box)
 
     def query(self, feature):
         assert len(self.id_map), 'no id in storage, register first!'
@@ -108,8 +124,6 @@ class Storage:
         idx = np.argmax(similarity_lst)
         id = id_lst[idx]
         sim = similarity_lst[idx]
-        if sim > SIMILARITY_THRESHOLD:
-            self.id_map[str(id)].last_seen = time()
         return {'id': str(id),
                 'similarity': similarity_lst[idx]}
 
@@ -161,10 +175,6 @@ class PersonAgent(Agent):
             response = requests.post(EXT_URL, files={'img': img_file})
             return response.json()
 
-        def up(feature, api_calls):
-            api_calls['register'] += 1
-            self.storage.reg(feature)
-
         def query(feature, api_calls):
             api_calls['query'] += 1
             try:
@@ -178,6 +188,7 @@ class PersonAgent(Agent):
         self.workers.extend([self.w_ext, self.w_cmp, self.w_par])
         self.matches = {}
         self.time0 = {}
+        self.reported = set()
 
     def on_new_det(self, t:Track, img_roi):
         self.w_ext.put(t, img_roi)
@@ -216,7 +227,9 @@ class PersonAgent(Agent):
                     if self.storage.object_type.is_overstay(seconds):
                         if not hasattr(t, 'par'):
                             self.w_par.put(t, _crop(frame_, t.box))
-                            print('[overstay] id:', i, '@', self.source)
+                            if i not in self.reported:
+                                self.reported.add(i)
+                                print('[overstay] id:', i, '@', self.source)
                             # TODO: save alerts
             self._post_det_procedure()
             self._post_ext_procedure()
@@ -239,7 +252,7 @@ class PersonAgent(Agent):
             t, feature = self.w_ext.get()
             t.feature = feature
             self.w_cmp.put(t, feature)
-            self.storage.reg(feature)
+            self.storage.reg(feature, t.box)
             self.api_calls['register'] += 1
 
     def _post_cmp_procedure(self, frame_):
@@ -283,12 +296,12 @@ class PersonAgent(Agent):
                 if hasattr(t, 'stay'):
                     t.text(frame, 'sec:%d' % int(t.stay), x + 3, y + h - 3, .6, 2)
                 if hasattr(t, 'par'):
-                    y += h//4
+                    y += 16
                     for a, m in zip(ATTRIBUTES, t.par):
                         if a == 'Female' and not m:
                             a = 'Male'
                             m = True
                         if m:
                             cv2.putText(frame, a, (x + w + 3, y),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, t.color, 2)
-                            y += h//8
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, t.color, 2)
+                            y += 16

@@ -14,7 +14,8 @@ class Worker:
                     i = self.q.get()
                     o = func(*i)
                     self.p.put(o)
-                except Exception:
+                except Exception as e:
+                    # print(e)
                     continue
 
         self.th = Thread(target=loop)
