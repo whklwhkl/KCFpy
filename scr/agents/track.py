@@ -64,7 +64,7 @@ class Track:
         b = t + h
         cv2.rectangle(frame, (l, t), (r, b), self.color, 2)
         # text('stay:%d' % int(self.time - self.time0), l + 3, b - 3, .6)
-        self.text(frame, 'HP:%d' % self.health, l, t - 3, .6)
+        # self.text(frame, 'HP:%d' % self.health, l, t - 3, .6)
         # text('LV:%d' % self.age, l + 3, b - 3, .6)
         self.text(frame, self.id if isinstance(self.id, str) else '?', r, t, 2.0, 4)
         self.text(frame, '{:.2f}'.format(self.similarity), r, b, .6)

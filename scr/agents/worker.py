@@ -3,7 +3,7 @@ from threading import Thread
 
 
 class Worker:
-    def __init__(self, func):
+    def __init__(self, func, debug=False):
         self.q = Queue(maxsize=32)  # in
         self.p = Queue(maxsize=32)  # out
         self.running = True
@@ -15,7 +15,8 @@ class Worker:
                     o = func(*i)
                     self.p.put(o)
                 except Exception as e:
-                    # print(e)
+                    if debug:
+                        print(e)
                     continue
 
         self.th = Thread(target=loop)

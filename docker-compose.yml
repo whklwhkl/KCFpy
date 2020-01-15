@@ -1,11 +1,11 @@
 version: "2.3"
 
 services:
-  search_engine:
-    image: reid
-    container_name: data_server
-    ports:
-      - 6669:6669
+  # search_engine:
+  #   image: reid
+  #   container_name: data_server
+  #   ports:
+  #     - 6669:6669
   detector:
     image: per_det
     container_name: person_detector
@@ -19,8 +19,14 @@ services:
     ports:
       - 6667:6667
   person_attribute:
-    image: par
+    image: par2
     container_name: par
     runtime: nvidia
     ports:
-      - 6668:6668
+      - 6669:6669
+  action:
+    image: act
+    container_name: action_recognition
+    runtime: nvidia
+    ports:
+      - 6671:6671

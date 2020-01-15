@@ -27,11 +27,13 @@ def _nd2file(img_nd):
 
 def _cvt_ltrb2ltwh(boxes):
     boxes_ = []
+    labels = []
     for b in boxes['dets']:
         boxes_.append(b['x1y1x2y2'])
+        labels.append(b['label'])
     boxes = np.array(boxes_)
     boxes[:, 2: 4] -= boxes[:, :2]
-    return boxes[:, :4]
+    return boxes[:, :4], labels
 
 
 def _crop(frame, trk_box):
@@ -158,7 +160,7 @@ class Agent:
         if self.w_det.has_feedback():
             frame_, boxes = self.w_det.get()
             if len(boxes):
-                boxes = _cvt_ltrb2ltwh(boxes)
+                boxes, labels = _cvt_ltrb2ltwh(boxes)
                 self.Track.update(frame_, boxes)
                 for t in self.Track.ALL:
                     if t.visible:

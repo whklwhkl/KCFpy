@@ -1,6 +1,9 @@
 from .agent import *
-from .agent import _crop, _nd2file
+from .agent import _crop, _nd2file, _cvt_ltrb2ltwh
+from utils.action import cut, frames2data
 from time import time
+
+import pickle
 
 
 PAR = True
@@ -11,6 +14,7 @@ ATTRIBUTES = ['Female', 'Front', 'Side', 'Back', 'Hat',
 SIMILARITY_THRESHOLD = .8
 DISTANCE_THRESHOLD = 200
 FEATURE_MOMENTUM = .9
+TIMEWALL = 30
 
 
 def make_object_type():
@@ -27,6 +31,9 @@ def make_object_type():
             self.imgs = []
             cls.current_id += 1
 
+        def add_img(self, frame):
+            self.imgs.append(cut(frame, self.box))
+
         def __str__(self):
             return self.id
 
@@ -41,46 +48,8 @@ def make_object_type():
         @staticmethod
         def is_far(delta):
             return delta > DISTANCE_THRESHOLD
+
     return Person
-
-
-def cut(img, bbox):
-    x1, y1, w, h = map(int, bbox)
-    height, width, _ = img.shape
-
-    xc = x1 + w //2
-    yc = y1 + h // 2
-
-    xlength = min(max(w, h), width, height) // 2
-    ylength = min(max(w, h), width, height) // 2
-
-    if xc - xlength < 0 and xc + xlength < width - 1:
-        xx1 = 0
-        xx2 = xlength*2
-    elif xc - xlength > 0 and xc + xlength > width - 1:
-        xx1 = width - 1 - xlength*2
-        xx2 = width - 1
-    elif xc - xlength < 0 and xc + xlength > width -1:
-        xx1 = 0
-        xx2 = width - 1
-    else:
-        xx1 = xc - xlength
-        xx2 = xc + xlength
-
-    if yc - ylength < 0 and yc + ylength < height - 1:
-        yy1 = 0
-        yy2 = ylength*2
-    elif yc - ylength > 0 and yc + ylength > height - 1:
-        yy1 = height - 1 - ylength*2
-        yy2 = height - 1
-    elif yc - ylength < 0 and yc + ylength > height - 1:
-        yy1 = 0
-        yy2 = height - 1
-    else:
-        yy1 = yc - ylength
-        yy2 = yc + ylength
-
-    return img[yy1:yy2, xx1:xx2, :]
 
 
 class Storage:
@@ -88,7 +57,6 @@ class Storage:
     def __init__(self, object_type, memory=30):
         self.id_map = {}
         self.memory = memory
-        self.frames = []
         self.object_type = object_type
 
     def add(self, feature, box):
@@ -136,9 +104,6 @@ class Storage:
         for k in delete_keys:
             del self.id_map[k]
 
-    def add_video(frame):
-        self.frames.append(frame)
-
     @staticmethod
     def compare(feature1, feature2):
         f1 = np.array(feature1)
@@ -158,17 +123,21 @@ class PersonAgent(Agent):
                                          'query',
                                          'refresh',
                                          'attributes',
+                                         'action',
                                          'counts']}
-        PAR_URL = 'http://%s:6668/par' % host
+        PAR_URL = 'http://%s:6669/par' % host
         EXT_URL = 'http://%s:6667/ext' % host
+        ACT_URL = 'http://%s:6671/act' % host
         self.storage = Storage(make_object_type())
+        # self.bag_storage = BagStorage()
 
         def par(img_file, api_calls):
             api_calls['attributes'] += 1
             # print(img_file)
             response = requests.post(PAR_URL, files={'img': img_file})
             # print(response)
-            return np.array(response.json()['predictions'], dtype=np.uint8)
+            return response.json()['predictions']  # docker image: par2
+            # return np.array(response.json()['predictions'], dtype=np.uint8)
 
         def ext(img_file, api_calls):
             api_calls['feature'] += 1
@@ -182,12 +151,21 @@ class PersonAgent(Agent):
             except AssertionError:
                 return {}
 
+        def act(img_list, api_calls):
+            api_calls['action'] += 1
+            a = frames2data(img_list)
+            response = requests.post(ACT_URL, pickle.dumps(a))
+            return response.json()[0]
+
         self.w_par = Worker(lambda i, x: (i, par(_nd2file(x), self.api_calls)))
         self.w_ext = Worker(lambda i, x: (i, ext(_nd2file(x), self.api_calls)))
         self.w_cmp = Worker(lambda i, x: (i, query(x, self.api_calls)))
-        self.workers.extend([self.w_ext, self.w_cmp, self.w_par])
+        self.w_act = Worker(lambda i, x: (i, act(x, self.api_calls)), debug=True)
+        self.workers.extend([self.w_ext, self.w_cmp, self.w_par, self.w_act])
         self.matches = {}
+        # memory
         self.time0 = {}
+        self.clips = {}  # video clips of action recognition for each person id
         self.reported = set()
 
     def on_new_det(self, t:Track, img_roi):
@@ -212,9 +190,9 @@ class PersonAgent(Agent):
                 self.storage.forget()
                 self.Track.decay()
             self.api_calls['counts'] = len(self.Track.ALL)
+            now = time()
             for t in self.Track.ALL:
                 i = t.id
-                now = time()
                 if i in self.time0:
                     seconds = now - self.time0[i]
                 else:
@@ -223,6 +201,9 @@ class PersonAgent(Agent):
                 t.stay = seconds
                 p = self.storage.id_map.get(i)
                 if p is not None:
+                    p.add_img(frame_) # type Person
+                    if len(p.imgs) > 10 and self.frame_count % TIMEWALL == 0:
+                        self.w_act.put(p.id, p.imgs[-10:])
                     p.last_seen = now
                     if self.storage.object_type.is_overstay(seconds):
                         if not hasattr(t, 'par'):
@@ -235,8 +216,8 @@ class PersonAgent(Agent):
             self._post_ext_procedure()
             self._post_cmp_procedure(frame_)
             self._post_reg_procedure()
-            if PAR:
-                self._post_par_procedure()
+            self._post_act_procedure()
+            self._post_par_procedure()
             # if not self.control_queue.empty():
             #     x, y = self.control_queue.get()
             #     self.click_handle(frame_, x, y)
@@ -246,6 +227,29 @@ class PersonAgent(Agent):
             self.display_queue.put(frame[...,::-1])  # give RGB
             self.frame_count += 1
         self._kill_workers()
+
+    def _post_det_procedure(self):
+        if self.w_det.has_feedback():
+            frame_, boxes = self.w_det.get()
+            if len(boxes):
+                boxes, labels = _cvt_ltrb2ltwh(boxes)
+                # TODO: seperate person and bags into boxes1 and boxes2
+                # memory bags in boxes2
+                # for b in boxes2:
+                #     self.bag_storage.reg(b)
+                self.Track.update(frame_, boxes)
+                for t in self.Track.ALL:
+                    if t.visible:
+                        if isinstance(t.id, int):
+                            if t.age % REFRESH_INTEVAL == 0:
+                                if t.age // REFRESH_INTEVAL:
+                                    self.api_calls['refresh'] += 1
+                                img_roi = _crop(frame_, t.box)
+                                self.on_new_det(t, img_roi)
+            else:
+                for t in self.Track.ALL:
+                    t.visible = False
+                    t.health -= 1 if t.age > self.Track.PROBATION else 9999
 
     def _post_ext_procedure(self):
         if not self.w_ext.p.empty():
@@ -288,6 +292,12 @@ class PersonAgent(Agent):
             t, att = self.w_par.get()            # person attributes
             setattr(t, 'par', att)
 
+    def _post_act_procedure(self):
+        if not self.w_act.p.empty():
+            i, ret = self.w_act.get()
+            if i in self.storage.id_map:
+                self.storage.id_map[i].action = ret[0]  # take the first action
+
     def _render(self, frame):
         super()._render(frame)
         for t in self.Track.ALL:
@@ -295,13 +305,22 @@ class PersonAgent(Agent):
             if t.visible:
                 if hasattr(t, 'stay'):
                     t.text(frame, 'sec:%d' % int(t.stay), x + 3, y + h - 3, .6, 2)
+                p = self.storage.id_map.get(t.id)
+                if p is not None and hasattr(p, 'action'):
+                    y += 20
+                    cv2.putText(frame, p.action, (x + w + 3, y),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1., t.color, 2)
                 if hasattr(t, 'par'):
-                    y += 16
-                    for a, m in zip(ATTRIBUTES, t.par):
-                        if a == 'Female' and not m:
-                            a = 'Male'
-                            m = True
-                        if m:
-                            cv2.putText(frame, a, (x + w + 3, y),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, t.color, 2)
-                            y += 16
+                    for a in t.par:
+                        y += 16
+                        cv2.putText(frame, a, (x + w + 3, y),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, t.color, 2)
+                    ## docker image: par
+                    # for a, m in zip(ATTRIBUTES, t.par):
+                    #     if a == 'Female' and not m:
+                    #         a = 'Male'
+                    #         m = True
+                    #     if m:
+                    #         cv2.putText(frame, a, (x + w + 3, y),
+                    #                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, t.color, 2)
+                    #         y += 16
