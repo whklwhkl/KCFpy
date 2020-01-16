@@ -16,7 +16,7 @@ DISTANCE_THRESHOLD = 200
 FEATURE_MOMENTUM = .9
 TIMEWALL = 30
 IMAGE_LIST_SIZE = 10
-MIN_OVERSTAY = 3
+MIN_OVERSTAY = 10
 
 
 def make_object_type():
@@ -211,11 +211,14 @@ class PersonAgent(Agent):
                     #     self.w_act.put(p.id, p.imgs[-IMAGE_LIST_SIZE:])
                     p.last_seen = now
                     if self.storage.object_type.is_overstay(seconds):
-                        if not hasattr(t, 'par'):
-                            self.w_par.put(t, _crop(frame_, t.box))
+                        if hasattr(t, 'par'):
+                            x, y, w, h = t.box
+                            t.text(frame, 'overstay', int(x), int(y + h + 20)) # type Track
                             if p.id not in self.reported:
                                 self.reported.add(p.id)
                                 print('[overstay] id:', p.id, '@', self.source)
+                        else:
+                            self.w_par.put(t, _crop(frame_, t.box))
                             # TODO: save alerts
             self._post_det_procedure()
             self._post_ext_procedure()
