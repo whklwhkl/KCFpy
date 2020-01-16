@@ -47,7 +47,7 @@ class Main:
             self.root.destroy()
 
         self.root.bind('<Escape>', lambda *x: escape())
-        W = self.root.winfo_screenwidth() // 4
+        W = self.root.winfo_screenwidth() // 2
         H = self.root.winfo_screenheight() // 2
         self.panel_size = W, H
         self.agents = agents

@@ -178,6 +178,9 @@ class PersonAgent(Agent):
         # memory
         self.reported = set()
 
+        self.th = Thread(target=self.loop, daemon=True)
+        self.th.start()
+
     def on_new_det(self, t:Track, img_roi):
         self.w_ext.put(t, img_roi)
 
