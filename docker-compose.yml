@@ -19,14 +19,20 @@ services:
     ports:
       - 6667:6667
   person_attribute:
-    image: par2
+    image: par
     container_name: par
     runtime: nvidia
     ports:
       - 6669:6669
-  action:
-    image: act
-    container_name: action_recognition
-    runtime: nvidia
-    ports:
-      - 6671:6671
+  # bag_detector:
+  #   image: per_bag_det
+  #   container_name: bag_det
+  #   runtime: nvidia
+  #   ports:
+  #     - 6670:6670
+  # action:
+  #   image: act
+  #   container_name: action_recognition
+  #   runtime: nvidia
+  #   ports:
+  #     - 6671:6671

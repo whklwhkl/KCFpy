@@ -15,6 +15,8 @@ SIMILARITY_THRESHOLD = .8
 DISTANCE_THRESHOLD = 200
 FEATURE_MOMENTUM = .9
 TIMEWALL = 30
+IMAGE_LIST_SIZE = 10
+MIN_OVERSTAY = 3
 
 
 def make_object_type():
@@ -28,18 +30,20 @@ def make_object_type():
             self.feature = feature
             self.box = box
             self.first_seen = self.last_seen = time()
-            self.imgs = []
+            self.imgs = []  # video clips of action recognition for each person id
             cls.current_id += 1
 
         def add_img(self, frame):
             self.imgs.append(cut(frame, self.box))
+            if len(self.imgs) > IMAGE_LIST_SIZE:
+                self.imgs.pop(0)
 
         def __str__(self):
             return self.id
 
         @staticmethod
         def is_overstay(seconds):
-            return seconds > 30
+            return seconds > MIN_OVERSTAY
 
         @staticmethod
         def is_alike(similarity):
@@ -54,7 +58,7 @@ def make_object_type():
 
 class Storage:
 
-    def __init__(self, object_type, memory=30):
+    def __init__(self, object_type, memory=15):
         self.id_map = {}
         self.memory = memory
         self.object_type = object_type
@@ -116,7 +120,6 @@ class PersonAgent(Agent):
 
     def __init__(self, source, host='localhost'):
         super().__init__(source, host)
-        self.q_reg = Queue(32)  # register queue
         self.api_calls = {k: 0 for k in ['register',
                                          'detection',
                                          'feature',
@@ -127,7 +130,7 @@ class PersonAgent(Agent):
                                          'counts']}
         PAR_URL = 'http://%s:6669/par' % host
         EXT_URL = 'http://%s:6667/ext' % host
-        ACT_URL = 'http://%s:6671/act' % host
+        # ACT_URL = 'http://%s:6671/act' % host
         self.storage = Storage(make_object_type())
         # self.bag_storage = BagStorage()
 
@@ -135,8 +138,15 @@ class PersonAgent(Agent):
             api_calls['attributes'] += 1
             # print(img_file)
             response = requests.post(PAR_URL, files={'img': img_file})
+            scores = response.json()['predictions']
+            att = []
+            for a, s in zip(ATTRIBUTES, scores):
+                if s > .7:
+                    att.append(a)
+                elif a == 'Female':
+                    att.append('Male')
             # print(response)
-            return response.json()['predictions']  # docker image: par2
+            return att
             # return np.array(response.json()['predictions'], dtype=np.uint8)
 
         def ext(img_file, api_calls):
@@ -151,21 +161,21 @@ class PersonAgent(Agent):
             except AssertionError:
                 return {}
 
-        def act(img_list, api_calls):
-            api_calls['action'] += 1
-            a = frames2data(img_list)
-            response = requests.post(ACT_URL, pickle.dumps(a))
-            return response.json()[0]
+        # def act(img_list, api_calls):
+        #     api_calls['action'] += 1
+        #     a = frames2data(img_list)
+        #     response = requests.post(ACT_URL, pickle.dumps(a))
+        #     return response.json()[0]
 
-        self.w_par = Worker(lambda i, x: (i, par(_nd2file(x), self.api_calls)))
+        self.w_par = Worker(lambda i, x: (i, par(_nd2file(x), self.api_calls)), debug=True)
         self.w_ext = Worker(lambda i, x: (i, ext(_nd2file(x), self.api_calls)))
         self.w_cmp = Worker(lambda i, x: (i, query(x, self.api_calls)))
-        self.w_act = Worker(lambda i, x: (i, act(x, self.api_calls)), debug=True)
-        self.workers.extend([self.w_ext, self.w_cmp, self.w_par, self.w_act])
+        # self.w_act = Worker(lambda i, x: (i, act(x, self.api_calls)))
+        self.workers.extend([self.w_ext, self.w_cmp, self.w_par,
+                             # self.w_act,
+                             ])
         self.matches = {}
         # memory
-        self.time0 = {}
-        self.clips = {}  # video clips of action recognition for each person id
         self.reported = set()
 
     def on_new_det(self, t:Track, img_roi):
@@ -192,31 +202,25 @@ class PersonAgent(Agent):
             self.api_calls['counts'] = len(self.Track.ALL)
             now = time()
             for t in self.Track.ALL:
-                i = t.id
-                if i in self.time0:
-                    seconds = now - self.time0[i]
-                else:
-                    self.time0[i] = now
-                    seconds = 0
-                t.stay = seconds
-                p = self.storage.id_map.get(i)
+                p = self.storage.id_map.get(t.id)
                 if p is not None:
+                    seconds = now - p.first_seen
+                    t.stay = seconds
                     p.add_img(frame_) # type Person
-                    if len(p.imgs) > 10 and self.frame_count % TIMEWALL == 0:
-                        self.w_act.put(p.id, p.imgs[-10:])
+                    # if len(p.imgs) >= IMAGE_LIST_SIZE and self.frame_count % TIMEWALL == 0:
+                    #     self.w_act.put(p.id, p.imgs[-IMAGE_LIST_SIZE:])
                     p.last_seen = now
                     if self.storage.object_type.is_overstay(seconds):
                         if not hasattr(t, 'par'):
                             self.w_par.put(t, _crop(frame_, t.box))
-                            if i not in self.reported:
-                                self.reported.add(i)
-                                print('[overstay] id:', i, '@', self.source)
+                            if p.id not in self.reported:
+                                self.reported.add(p.id)
+                                print('[overstay] id:', p.id, '@', self.source)
                             # TODO: save alerts
             self._post_det_procedure()
             self._post_ext_procedure()
             self._post_cmp_procedure(frame_)
-            self._post_reg_procedure()
-            self._post_act_procedure()
+            # self._post_act_procedure()
             self._post_par_procedure()
             # if not self.control_queue.empty():
             #     x, y = self.control_queue.get()
@@ -267,6 +271,8 @@ class PersonAgent(Agent):
                 t.similarity = ret.get('similarity')
                 if t.similarity > SIMILARITY_THRESHOLD:
                     c = colors[hash(i or 0) % 256]
+                    # t.color = c
+                    # t.id = i
                     # print(t.id, 'color', c)
                     if i in self.matches:
                         f = self.matches[i]
@@ -280,23 +286,17 @@ class PersonAgent(Agent):
                     self.matches[i].color = c
                     self.matches[i].id = i
 
-    def _post_reg_procedure(self):
-        if not self.q_reg.empty():
-            self.q_reg.get()
-            for t in self.Track.ALL:
-                if t.feature is not None:
-                    self.w_cmp.put(t, t.feature)
-
     def _post_par_procedure(self):
         if not self.w_par.p.empty():
             t, att = self.w_par.get()            # person attributes
             setattr(t, 'par', att)
 
-    def _post_act_procedure(self):
-        if not self.w_act.p.empty():
-            i, ret = self.w_act.get()
-            if i in self.storage.id_map:
-                self.storage.id_map[i].action = ret[0]  # take the first action
+    # def _post_act_procedure(self):
+    #     if not self.w_act.p.empty():
+    #         i, ret = self.w_act.get()
+    #         if i in self.storage.id_map:
+    #             self.storage.id_map[i].action = ','.join(ret)  # take the first action
+    #             # self.storage.id_map[i].action = ret[0]  # take the first action
 
     def _render(self, frame):
         super()._render(frame)
@@ -304,23 +304,15 @@ class PersonAgent(Agent):
             x, y, w, h = map(int, t.box)
             if t.visible:
                 if hasattr(t, 'stay'):
-                    t.text(frame, 'sec:%d' % int(t.stay), x + 3, y + h - 3, .6, 2)
+                    t.text(frame, '%d' % int(t.stay), x + 3, y + h - 3, .6, 2)
                 p = self.storage.id_map.get(t.id)
                 if p is not None and hasattr(p, 'action'):
                     y += 20
                     cv2.putText(frame, p.action, (x + w + 3, y),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1., t.color, 2)
                 if hasattr(t, 'par'):
+                    # docker image: par2
                     for a in t.par:
                         y += 16
                         cv2.putText(frame, a, (x + w + 3, y),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, t.color, 2)
-                    ## docker image: par
-                    # for a, m in zip(ATTRIBUTES, t.par):
-                    #     if a == 'Female' and not m:
-                    #         a = 'Male'
-                    #         m = True
-                    #     if m:
-                    #         cv2.putText(frame, a, (x + w + 3, y),
-                    #                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, t.color, 2)
-                    #         y += 16

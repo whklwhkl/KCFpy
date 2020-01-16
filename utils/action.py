@@ -69,26 +69,10 @@ def frames2data(frames):
         y1 = (h1 - th) // 2
         box = np.array([x1, y1, x1 + tw, y1 + th])
         frame = frame[y1: y1 + th, x1: x1 + tw, :]
-        # frame_ = []
-        # for b in box:
-        #     l,t,r,b = b
-        #     frame.append(frame[t:b, l:r, :])
-        # print('???')
-        # frame = np.stack(frame_) if len(frame_) else np.zeros([0, th, tw, 3], np.uint8)
-        # frame = mmcv.imcrop(frame, box)
 
         frame -= mean
-        # frame = mmcv.imnormalize(frame, mean=[104, 117, 128], std=[1, 1, 1], to_rgb=False)
         img = frame.astype(np.float16).transpose([2, 0, 1])
         simg.append(img)
-        # if i == 0:
-        #     simg = torch.from_numpy(frame.transpose((2, 0, 1))).float()
-        #     simg = torch.unsqueeze(simg, 0)
-        # else:
-        #     img = torch.from_numpy(frame.transpose((2, 0, 1))).float()
-        #     img = torch.unsqueeze(img, 0)
-        #     simg = torch.cat((simg, img), 0)
 
-    # ssimg = torch.unsqueeze(simg, 0)
     ssimg = np.stack(simg)[None]
     return ssimg
