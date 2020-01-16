@@ -120,14 +120,20 @@ class PersonAgent(Agent):
 
     def __init__(self, source, host='localhost'):
         super().__init__(source, host)
+        class _Track(Track):
+            ALL = set()
+            current_id = 0
+            health = 2
+            CANDIDATE_IOU = .5
+
+        self.Track = _Track
         self.api_calls = {k: 0 for k in ['register',
                                          'detection',
                                          'feature',
                                          'query',
                                          'refresh',
                                          'attributes',
-                                         'action',
-                                         'counts']}
+                                         'action']}
         PAR_URL = 'http://%s:6669/par' % host
         EXT_URL = 'http://%s:6667/ext' % host
         # ACT_URL = 'http://%s:6671/act' % host
@@ -202,7 +208,6 @@ class PersonAgent(Agent):
                 self.w_det.put(frame_)
                 self.storage.forget()
                 self.Track.decay()
-            self.api_calls['counts'] = len(self.Track.ALL)
             now = time()
             for t in self.Track.ALL:
                 p = self.storage.id_map.get(t.id)
@@ -214,9 +219,8 @@ class PersonAgent(Agent):
                     #     self.w_act.put(p.id, p.imgs[-IMAGE_LIST_SIZE:])
                     p.last_seen = now
                     if self.storage.object_type.is_overstay(seconds):
+                        t.overstay = True
                         if hasattr(t, 'par'):
-                            x, y, w, h = t.box
-                            t.text(frame, 'overstay', int(x), int(y + h + 20)) # type Track
                             if p.id not in self.reported:
                                 self.reported.add(p.id)
                                 print('[overstay] id:', p.id, '@', self.source)
@@ -249,6 +253,7 @@ class PersonAgent(Agent):
                 #     self.bag_storage.reg(b)
                 self.Track.update(frame_, boxes)
                 for t in self.Track.ALL:
+                    # t.visible=True
                     if t.visible:
                         if isinstance(t.id, int):
                             if t.age % REFRESH_INTEVAL == 0:
@@ -309,6 +314,8 @@ class PersonAgent(Agent):
         for t in self.Track.ALL:
             x, y, w, h = map(int, t.box)
             if t.visible:
+                if hasattr(t, 'overstay'):
+                    t.text(frame, 'overstay', int(x), int(y + h + 20)) # type Track
                 if hasattr(t, 'stay'):
                     t.text(frame, '%d' % int(t.stay), x + 3, y + h - 3, .6, 2)
                 p = self.storage.id_map.get(t.id)

@@ -19,7 +19,7 @@ if __name__ == '__main__':
 
     opt = parser.parse_args()
 
-    host = '192.168.20.196'
+    host = 'localhost'
 
     if 0:
         ips = []
