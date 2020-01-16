@@ -84,6 +84,8 @@ class Main:
             pan = tk.Label(self.root)
             pan.grid(row=1 + row, column=1 + clm)
 
+            '''
+
             def ctrl(event):
                 x = event.x / W
                 y = event.y / H
@@ -93,6 +95,8 @@ class Main:
                     print('not supported')
 
             pan.bind('<Button 1>', ctrl)
+            '''
+            
             self.panels[pan] = a
         # todo: draw the map on the cell 2,2
         if len(agents) == 3:

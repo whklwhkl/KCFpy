@@ -4,10 +4,6 @@ from datetime import datetime
 import os
 
 PAR = True
-ATTRIBUTES = ['Female', 'Front', 'Side', 'Back', 'Hat',
-              'Glasses', 'Hand Bag', 'Shoulder Bag', 'Backpack',
-              'Hold Objects in Front', 'Short Sleeve', 'Long Sleeve',
-              'Long Coat', 'Trousers', 'Skirt & Dress']
 
 #Output
 base_dir = './output'
@@ -26,7 +22,7 @@ COSINE_LOWER_THRESH = 0.85
 FEATURE_MOMENTUM = 1
 
 #Overstay Parameter in Seconds
-OVERSTAY_THRESH = 60
+OVERSTAY_THRESH = 20
 
 
 def make_object_type():
@@ -278,9 +274,11 @@ class VehicleAgent(Agent):
     def loop(self):
         while self.running:
 
+            '''
             #Check date every 100 frames
             if self.frame_count % 100 == 0:
                 self.check_date()
+            '''
 
             if self.suspend == True:
                 sleep(0.5)

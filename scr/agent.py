@@ -133,8 +133,9 @@ class Agent:
         self.Track = _Track
         self.running = True
         self.suspend = False
-        self.th = Thread(target=self.loop)
-        self.th.start()
+        
+        #self.th = Thread(target=self.loop)
+        #self.th.start()
 
     def loop(self):
         while self.running:
