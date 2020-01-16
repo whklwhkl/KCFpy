@@ -2,6 +2,7 @@ from .agent import *
 from .agent import _crop, _nd2file, _cvt_ltrb2ltwh
 from utils.action import cut, frames2data
 from time import time
+from datetime import datetime
 
 import pickle
 
@@ -30,6 +31,7 @@ def make_object_type():
             self.feature = feature
             self.box = box
             self.first_seen = self.last_seen = time()
+            self.last_save = 0
             self.imgs = []  # video clips of action recognition for each person id
             cls.current_id += 1
 
@@ -120,6 +122,13 @@ class PersonAgent(Agent):
 
     def __init__(self, source, host='localhost'):
         super().__init__(source, host)
+        self.current_date = datetime.now().date()
+        source_dir = os.path.splitext(source)[0]
+        source_dir = os.path.basename(source_dir)
+        self.output_dir = os.path.join('output', source_dir, str(self.current_date))
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+        self.output_log = os.path.join(self.output_dir + '/log.txt')
         class _Track(Track):
             ALL = set()
             current_id = 0
@@ -217,15 +226,27 @@ class PersonAgent(Agent):
                     p.add_img(frame_) # type Person
                     # if len(p.imgs) >= IMAGE_LIST_SIZE and self.frame_count % TIMEWALL == 0:
                     #     self.w_act.put(p.id, p.imgs[-IMAGE_LIST_SIZE:])
-                    p.last_seen = now
                     if self.storage.object_type.is_overstay(seconds):
                         t.overstay = True
                         if hasattr(t, 'par'):
+                            if now - p.last_save > 30:
+                                cv2.imwrite(os.path.join(self.output_dir, '{}_{}_{}.jpg'.format(p.id, '_'.join(t.par), datetime.now())),
+                                            self.crop(frame_, t.box))
+                                p.last_save = now
                             if p.id not in self.reported:
                                 self.reported.add(p.id)
-                                print('[overstay] id:', p.id, '@', self.source)
+                                p.example = self.crop(frame_, p.box)
+                                p.par = t.par
+                                p.color = t.color
+                                print('[overstay] id:', p.id,
+                                      'attr:', ' '.join(t.par),
+                                      'loc:', self.source)
+                                print('[overstay] id:', p.id,
+                                      'attr:', ' '.join(t.par),
+                                      'loc:', self.source, file=open(self.output_log, 'a'))
                         else:
                             self.w_par.put(t, _crop(frame_, t.box))
+                    p.last_seen = now
                             # TODO: save alerts
             self._post_det_procedure()
             self._post_ext_procedure()
@@ -236,6 +257,22 @@ class PersonAgent(Agent):
             #     x, y = self.control_queue.get()
             #     self.click_handle(frame_, x, y)
             self._render(frame)
+            x_offset = 200
+            for p in list(self.storage.id_map.values()):
+                if hasattr(p, 'example'):
+                    example = p.example
+                    h, w, _ = example.shape
+                    x_offset_ = x_offset + w
+                    frame[0:h, x_offset:x_offset_] = example
+                    cv2.rectangle(frame, (x_offset, 0), (x_offset_, h), p.color, 1)
+                    cv2.putText(frame, p.id, (x_offset+w//2, h//2),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.2, p.color, 2)
+                    y_offset = 20
+                    for a in p.par:
+                        cv2.putText(frame, a, (x_offset, h + y_offset),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, p.color, 2)
+                        y_offset += 20
+                    x_offset = x_offset_
             # print(self.display_queue.qsize())
             # print(self.w_cmp.p.qsize(), self.w_cmp.q.qsize())
             self.display_queue.put(frame[...,::-1])  # give RGB
@@ -310,10 +347,27 @@ class PersonAgent(Agent):
     #             # self.storage.id_map[i].action = ret[0]  # take the first action
 
     def _render(self, frame):
-        super()._render(frame)
+        cv2.rectangle(frame, (0,0), (200, 225), (128,128,128), -1)
+        cv2.putText(frame, 'Tracks:%d' % len(self.Track.ALL), (10, 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+        for i, kv in enumerate(self.api_calls.items()):
+            cv2.putText(frame, '{:<10}'.format(kv[0]), (10, i*20 + 60),
+                        cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 0), 1)
+            cv2.putText(frame, '{:>6}'.format(kv[1]), (100, i*20 + 60),
+                        cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 0), 1)
+        # trk_lst = []
+        # for trk in cls.ALL:
+        #     if isinstance(trk.id, str):
+        #         trk_lst += [trk]
+        #     else:
+        #         trk._render(frame)  # unmatched tracks
+        # for trk in trk_lst:
+        #     if trk.visible:
+        #         trk._render(frame)  # tracks with matched ids
         for t in self.Track.ALL:
-            x, y, w, h = map(int, t.box)
             if t.visible:
+                t._render(frame)
+                x, y, w, h = map(int, t.box)
                 if hasattr(t, 'overstay'):
                     t.text(frame, 'overstay', int(x), int(y + h + 20)) # type Track
                 if hasattr(t, 'stay'):
@@ -329,3 +383,13 @@ class PersonAgent(Agent):
                         y += 16
                         cv2.putText(frame, a, (x + w + 3, y),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, t.color, 2)
+    @staticmethod
+    def crop(frame, trk_box):
+        H, W, _ = frame.shape
+        left, t, w, h = map(int, trk_box)
+        left = max(left, 0)
+        t = max(t, 0)
+        r = min(left + w, W)
+        b = min(t + h, H)
+        crop = frame[t: b, left: r, :]
+        return crop
