@@ -1,0 +1,4 @@
+classes=3
+train=data/merge/train.txt
+valid=data/merge/valid.txt
+names=data/merge/classes.names

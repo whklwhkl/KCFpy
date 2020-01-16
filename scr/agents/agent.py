@@ -94,8 +94,8 @@ class Agent:
         self.running = True
         self.suspend = False
         self.on_det_funcs = []
-        self.th = Thread(target=self.loop, daemon=True)
-        self.th.start()
+        #self.th = Thread(target=self.loop, daemon=True)
+        #self.th.start()
 
     def loop(self):
         while self.running:

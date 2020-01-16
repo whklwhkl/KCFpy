@@ -1,0 +1,4 @@
+classes=3
+train=data/wuxiv2/train.txt
+valid=data/wuxiv2/valid.txt
+names=data/wuxiv2/classes.names
