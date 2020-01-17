@@ -1,2 +1,2 @@
 from .agents import Agent, PersonAgent
-from .gui import Main
+from .gui2 import Main

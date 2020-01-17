@@ -275,7 +275,7 @@ class PersonAgent(Agent):
                     x_offset = x_offset_
             # print(self.display_queue.qsize())
             # print(self.w_cmp.p.qsize(), self.w_cmp.q.qsize())
-            self.display_queue.put(frame[...,::-1])  # give RGB
+            self.display_queue.put(frame)  # give RGB
             self.frame_count += 1
         self._kill_workers()
 

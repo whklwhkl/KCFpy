@@ -4,6 +4,7 @@ import time
 import tkinter as tk
 from PIL import Image, ImageTk
 import numpy as np
+import cv2
 
 
 class Map:
@@ -96,7 +97,7 @@ class Main:
 
             pan.bind('<Button 1>', ctrl)
             '''
-            
+
             self.panels[pan] = a
         # todo: draw the map on the cell 2,2
         if len(agents) == 3:
@@ -110,7 +111,8 @@ class Main:
             for i, (a, p) in enumerate(zip(self.agents, self.panels)):
                 if not a.display_queue.empty():
                     img = a.display_queue.get()
-                    im = Image.fromarray(img).resize(self.panel_size)
+                    img = cv2.resize(img, self.panel_size)
+                    im = Image.fromarray(img)
                     tkim = ImageTk.PhotoImage(im)
                     self.frames[i] = tkim
                     # print(a.frames[i])
