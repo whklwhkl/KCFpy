@@ -31,6 +31,13 @@ class Main:
         self.x0 = [i % clms * self.panel_size[0] for i in range(n)]
         self.x1 = [i + self.panel_size[0] for i in self.x0]
         self.box = list(zip(self.y0, self.y1, self.x0, self.x1))
+        def foo(event, x, y, flags, param):
+            if event == cv2.EVENT_LBUTTONDOWN:
+                for i, (y0, y1, x0, x1) in enumerate(self.box):
+                    if x0<=x<x1 and y0<=y<y1:
+                        # TODO: play a video clip for 10 seconds
+                        print('cam {}: x {}, y {}'.format(i, x-x0, y-y0))
+        cv2.setMouseCallback(self.name, foo)
 
         def _reset():
             reset = False
