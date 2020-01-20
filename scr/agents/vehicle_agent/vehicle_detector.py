@@ -106,6 +106,8 @@ class Vehicle_Detector():
 		for item in detections:
 			coordinates = item[:4].type(torch.int).tolist()
 
+			if coordinates[0] <= 0 or coordinates[1] <= 0 or coordinates[2] <= 0 or coordinates[3] <= 0: continue
+
 			width = coordinates[2] - coordinates[0]
 			height = coordinates[3] - coordinates[1]
 			area = width * height

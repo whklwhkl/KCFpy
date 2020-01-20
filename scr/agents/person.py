@@ -358,7 +358,9 @@ class PersonAgent(Agent):
         #     if trk.visible:
         #         trk._render(frame)  # tracks with matched ids
         for t in self.Track.ALL:
-            if t.visible:
+            if hasattr(t, 'overstay') == False: continue
+
+            if t.visible and t.overstay:
                 t._render(frame)
                 x, y, w, h = map(int, t.box)
                 if hasattr(t, 'overstay'):

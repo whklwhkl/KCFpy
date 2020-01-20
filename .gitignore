@@ -1,0 +1,13 @@
+#Directories
+/__pycache__
+/output
+/models
+
+#Files
+*.pyc
+*.jpg
+*.avi
+*.pth
+*.pt
+*.zip
+*.weights
