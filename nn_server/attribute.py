@@ -24,7 +24,11 @@ class Attribut:
             att = self.model(img[None].cuda())
             att = torch.sigmoid(att)[0].cpu()
             att = att[SELECTED_ATTRIBUTES]
-        return ATTRIBUTES[att > self.threshold].tolist()
+        select = att > self.threshold
+        att = ATTRIBUTES[att > self.threshold].tolist()
+        if not select[0]:
+            att = ['Male'] + att
+        return att
 
 
 async def preprocess(img):

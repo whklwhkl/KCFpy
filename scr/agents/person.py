@@ -1,5 +1,5 @@
 from .agent import *
-from .agent import _crop, _nd2file, _cvt_ltrb2ltwh
+from .agent import _crop, _nd2file
 from utils.action import cut, frames2data
 from time import time
 from datetime import datetime
@@ -143,8 +143,8 @@ class PersonAgent(Agent):
                                          'refresh',
                                          'attributes',
                                          'action']}
-        PAR_URL = 'http://%s:6669/par' % host
-        EXT_URL = 'http://%s:6667/ext' % host
+        PAR_URL = 'http://%s:6666/att' % host
+        EXT_URL = 'http://%s:6666/fea' % host
         # ACT_URL = 'http://%s:6671/act' % host
         self.storage = Storage(make_object_type())
         # self.bag_storage = BagStorage()
@@ -153,14 +153,7 @@ class PersonAgent(Agent):
             api_calls['attributes'] += 1
             # print(img_file)
             response = requests.post(PAR_URL, files={'img': img_file})
-            scores = response.json()['predictions']
-            att = []
-            for a, s in zip(ATTRIBUTES, scores):
-                if s > .7:
-                    att.append(a)
-                elif a == 'Female':
-                    att.append('Male')
-            # print(response)
+            att = response.json()
             return att
             # return np.array(response.json()['predictions'], dtype=np.uint8)
 
@@ -393,3 +386,15 @@ class PersonAgent(Agent):
         b = min(t + h, H)
         crop = frame[t: b, left: r, :]
         return crop
+
+
+def _cvt_ltrb2ltwh(boxes):
+    boxes_ = []
+    labels = []
+    for b in boxes:
+        labels.append(b['label'])
+        b = b['box']
+        boxes_.append([b['left'], b['top'], b['right'], b['bottom']])
+    boxes = np.array(boxes_)
+    boxes[:, 2: 4] -= boxes[:, :2]
+    return boxes[:, :4], labels
