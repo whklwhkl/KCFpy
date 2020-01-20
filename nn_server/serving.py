@@ -20,7 +20,7 @@ async def read_image(request):
     return img
 
 
-detector = Detector('half_h416_w416.pt', (416, 416), 0.3, 0.5)
+detector = Detector('half_h416_w416.pt', (416, 416), 0.85, 0.3)
 feature = Feature('r92m91.pt')
 attribute = Attribut('model.pth', .7)
 

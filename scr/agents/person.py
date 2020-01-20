@@ -228,7 +228,7 @@ class PersonAgent(Agent):
                                 p.last_save = now
                             if p.id not in self.reported:
                                 self.reported.add(p.id)
-                                p.example = self.crop(frame_, p.box)
+                                p.example = self.crop(frame_, t.box)
                                 p.par = t.par
                                 p.color = t.color
                                 print('[overstay] id:', p.id,
@@ -358,7 +358,7 @@ class PersonAgent(Agent):
         #     if trk.visible:
         #         trk._render(frame)  # tracks with matched ids
         for t in self.Track.ALL:
-            if t.visible:
+            if t.visible and getattr(t, 'overstay', False):
                 t._render(frame)
                 x, y, w, h = map(int, t.box)
                 if hasattr(t, 'overstay'):
