@@ -1,4 +1,6 @@
 from .agent import *
+from .record import Record
+
 from time import time
 from datetime import datetime
 import os
@@ -21,11 +23,7 @@ COSINE_LOWER_THRESH = 0.85
 #Feature Smoothing Parameter
 FEATURE_MOMENTUM = 1
 
-#Overstay Parameter in Seconds
-OVERSTAY_THRESH = 20
-
-
-def make_object_type():
+def make_object_type(overstay):
     class Vehicle:
 
         current_id = 0
@@ -44,7 +42,7 @@ def make_object_type():
 
         @staticmethod
         def is_overstay(seconds):
-            return seconds > OVERSTAY_THRESH
+            return seconds > overstay
 
         @staticmethod
         def is_alike(similarity):
@@ -164,8 +162,12 @@ class VehicleAgent(Agent):
         self.current_date = datetime.now().date()
 
         #Create directories
-        source_dir = source.split('/')
-        source_dir = source_dir[len(source_dir) - 1]
+        #source_dir = source.split('/')
+        #source_dir = source_dir[len(source_dir) - 1]
+
+        source_dir = source[source.find('@')+1:source.find('/cam')]
+        # source_dir = os.path.splitext(source)[0]
+        source_dir = os.path.basename(source_dir)
 
         #Output directory
         self.output_dir = os.path.join(os.path.join(base_dir, str(source_dir)), str(self.current_date))
@@ -187,10 +189,12 @@ class VehicleAgent(Agent):
                                          'counts']}
         #If drop off point
         if scene == 0:                              
-            self.storage = Storage(make_object_type())
+            self.storage = Storage(make_object_type(180))
+            #self.OVERSTAY_THRESH = 180
         #If carpark
         else:
-            self.storage = Storage(make_object_type(), memory = 60)
+            self.storage = Storage(make_object_type(60))
+            #self.OVERSTAY_THRESH = 60
 
         from .vehicle_agent.vehicle_detector import Vehicle_Detector
         #from .vehicle_agent.attribute import VehicleAttributes
@@ -236,8 +240,13 @@ class VehicleAgent(Agent):
             ret = self.vehicle_attribute.predict(img)
             return t, ret
 
+        #Function to put frame into Record object and push to queue
+        def output(record, frame):
+            record.add_frame(frame)
+            return record, frame
+
         #Worker for detetion
-        self.w_det = Worker(lambda x : (x, det(x)))
+        self.w_det = Worker(lambda x : (x, det(x)), debug = True)
         
         self.w_var = Worker(lambda i, x: (i, var(i, x)), debug = True)
 
@@ -247,10 +256,13 @@ class VehicleAgent(Agent):
         #Takes in Tracker Object and Extracted features
         self.w_cmp = Worker(lambda i, x: (i, query(x)))
 
+        #Worker containing the Record objects of overstayed objects
+        self.w_record = Worker(lambda x, i: (x, output(x, i)))
+
         #Worker for Vehicle Attributes, takes in tracker object and cropped image
         #self.w_par = Worker(lambda i, x : (i, var(x)))
 
-        self.workers = [self.w_det, self.w_ext, self.w_cmp, self.w_var]
+        self.workers = [self.w_det, self.w_ext, self.w_cmp, self.w_var, self.w_record]
 
         self.matches = {}
         self.time0 = {}
@@ -325,12 +337,15 @@ class VehicleAgent(Agent):
     
                         if hasattr(t, 'par'):
                             #Output into folder
-                            cv2.imwrite(self.output_dir + '/' + str(i) + '_' + str(t.par[1][0]) + str(t.par[1][1]) + '.jpg', _crop(frame_, t.box))
+                            output_path = self.output_dir + '/' + str(i) + '_' + str(t.par[1][0]) + str(t.par[1][1])
+                            cv2.imwrite(output_path + '.jpg', _crop(frame_, t.box))
                             #End of output
 
                             if i not in self.reported:
                                 self.reported.add(i)
                                 print('[overstay] id:', i, '@', self.source)
+                                self.w_record.put(Record(output_path), frame_)
+
 
                                 with open(self.output_log, 'a') as f:
                                     message = 'Overstay id: {} Frame no: {} @ {}'.format(i, self.frame_count, self.source)
@@ -350,7 +365,12 @@ class VehicleAgent(Agent):
 
             #Render frame and add it to display worker queue
             self._render(frame)
-            self.display_queue.put(frame[...,::-1])  # give RGB
+
+            #Perform post output procedure
+            self._post_output_procedure(frame)
+
+            #self.display_queue.put(frame[...,::-1])  # give RGB
+            self.display_queue.put(frame)
             self.frame_count += 1
 
         self._kill_workers()
@@ -434,6 +454,16 @@ class VehicleAgent(Agent):
             t, att = self.w_var.get()
             setattr(t, 'par', att)
 
+    #Function to perform post output procedure
+    def _post_output_procedure(self, frame):
+        if self.w_record.has_feedback():
+            current_record, _ = self.w_record.get()
+            #If True, save video
+            if current_record.check_save():
+                current_record.save_video()
+            else:
+                self.w_record.put(current_record, frame)
+
     #Render frame
     def _render(self, frame):
         #super()._render(frame)
@@ -471,3 +501,5 @@ class VehicleAgent(Agent):
                                                 cv2.FONT_HERSHEY_SIMPLEX, 1., t.color, 2)
                                 cv2.putText(frame, str(item), (x + w + 3, y),
                                                 cv2.FONT_HERSHEY_SIMPLEX, 1., t.color, 2)
+
+        return frame
