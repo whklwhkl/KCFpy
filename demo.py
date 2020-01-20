@@ -40,8 +40,8 @@ if __name__ == '__main__':
             VehicleAgent('~/Videos/jp/L1-REC-F03_DROP-OFF POINT - 1280 x 720 - 10fps_20191218_185810.avi', opt, host),
             VehicleAgent('~/Videos/jp/L1-CP-F11_CARPARK BARRIER - 1280 x 720 - 10fps_20191218_095417.avi', opt, host, scene = 1),
             #PersonAgent('~/Videos/jp/L1-CP-F12_DRIVEWAY - 1280 x 720 - 10fps_20191220_155815.avi', host),
-            #PersonAgent('~/Videos/jp/L1-CP-F12_DRIVEWAY - 1280 x 720 - 10fps_20191220_155815.avi', host),
-            PersonAgent('~/Videos/jp/L1-MB-PTZ1_LOADING BAYS - 1280 x 720 - 10fps_20191220_160054.avi', host),
+            PersonAgent('~/Videos/jp/L1-CP-F12_DRIVEWAY - 1280 x 720 - 10fps_20191220_155815.avi', host),
+            #PersonAgent('~/Videos/jp/L1-MB-PTZ1_LOADING BAYS - 1280 x 720 - 10fps_20191220_160054.avi', host),
             PersonAgent('~/Videos/jp/L1-MB-PTZ1_LOADING BAYS - 1280 x 720 - 10fps_20191220_160054.avi', host),
             #VehicleAgent('/home/jeff/Desktop/capitaland_footage/L1-REC-F03_DROP-OFF POINT - 1280 x 720 - 10fps_20191218_194842.avi', opt, host),
 

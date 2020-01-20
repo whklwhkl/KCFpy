@@ -27,10 +27,15 @@ class Vehicle_Detector():
 		else: 
 			_ = load_darknet_weights(self.model, opt.weights)
 
-		self.model.to(self.device).eval()
+		self.model.to(self.device).eval().half()
 
 		# Get classes and colors
 		self.classes = load_classes(parse_data_cfg(opt.data)['names'])
+
+		if self.opt.conf_thres == 0.7:
+			self.scene = 1
+		else:
+			self.scene = 0
 
 		print('--- Detector Initialised ---')
 
@@ -38,7 +43,8 @@ class Vehicle_Detector():
 	def detect(self, img):
 		#Pre-process
 		img = self.pre_process(img)
-		img = torch.from_numpy(img).to(self.device)
+		img = torch.from_numpy(img).half()
+		img = img.to(self.device)
 
 		if img.ndimension() == 3:
 			img = img.unsqueeze(0)
@@ -51,7 +57,7 @@ class Vehicle_Detector():
 		#print(pred)
 
 		# Apply NMS
-		pred = non_max_suppression(pred, self.opt.conf_thres, self.opt.nms_thres)
+		pred = non_max_suppression(pred.float(), self.opt.conf_thres, self.opt.nms_thres)
 
 		det = self.process_detections(pred)
 
@@ -114,6 +120,8 @@ class Vehicle_Detector():
 
 			#Check x2
 			if coordinates[2] <= 1220 and coordinates[3] >= 215 and area >= self.max_area:
+				bbox_list.append(coordinates)
+			elif self.scene == 1 and area >= self.max_area:
 				bbox_list.append(coordinates)
 
 		return bbox_list

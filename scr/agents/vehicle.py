@@ -159,25 +159,21 @@ class VehicleAgent(Agent):
         super().__init__(source, host)
 
         #Current date
-        self.current_date = datetime.now().date()
+        self.current_date = datetime.now().date() # - timedelta(days=1)
 
         #Create directories
-        #source_dir = source.split('/')
-        #source_dir = source_dir[len(source_dir) - 1]
-
         source_dir = source[source.find('@')+1:source.find('/cam')]
-        # source_dir = os.path.splitext(source)[0]
-        source_dir = os.path.basename(source_dir)
+        self.source_dir = os.path.basename(source_dir)
 
         #Output directory
-        self.output_dir = os.path.join(os.path.join(base_dir, str(source_dir)), str(self.current_date))
+        self.output_dir = os.path.join(os.path.join(base_dir, str(self.source_dir)), str(self.current_date))
 
         #Output log .txt
-        self.output_log = os.path.join(os.path.join(base_dir, str(source_dir)), str(self.current_date) + '/log.txt')
+        self.output_log = os.path.join(self.output_dir + '/log.txt')
 
         #Create directory if it does not exist
-        if not os.path.exists(os.path.join(os.path.join(base_dir, str(source_dir)), str(self.current_date))):
-            os.makedirs(os.path.join(os.path.join(base_dir, str(source_dir)), str(self.current_date)))
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
 
         #self.q_reg = Queue(32)  # register queue
         self.api_calls = {k: 0 for k in ['register',
@@ -279,19 +275,25 @@ class VehicleAgent(Agent):
     #Function to check current system date
     def check_date(self):
         if datetime.now().date() > self.current_date:
-            os.makedirectory(str(datetime.now().date()))
+            print('Creating new directory for {}'.format(datetime.now().date()))
+
+            #Update date and create new directory
             self.current_date = datetime.now().date()
+            new_dir = os.path.join(os.path.join(base_dir, str(self.source_dir)), str(self.current_date))
+            os.makedirs(new_dir)
+
+            #Change output directory and output log file paths
+            self.output_dir = new_dir
+            self.output_log = new_dir + '/log.txt'
 
     #Main loop
     def loop(self):
         while self.running:
 
-            '''
-            #Check date every 100 frames
-            if self.frame_count % 100 == 0:
+            #Check date every 600 frames
+            if self.frame_count % 600 == 0:
                 self.check_date()
-            '''
-
+            
             if self.suspend == True:
                 sleep(0.5)
             ret, frame = self.cap.read()

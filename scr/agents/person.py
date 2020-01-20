@@ -1,5 +1,6 @@
 from .agent import *
 from .agent import _crop, _nd2file
+from .record import Record
 from utils.action import cut, frames2data
 from time import time
 from datetime import datetime
@@ -17,7 +18,7 @@ DISTANCE_THRESHOLD = 200
 FEATURE_MOMENTUM = .9
 TIMEWALL = 30
 IMAGE_LIST_SIZE = 10
-MIN_OVERSTAY = 10
+MIN_OVERSTAY = 120
 
 
 def make_object_type():
@@ -122,12 +123,17 @@ class PersonAgent(Agent):
 
     def __init__(self, source, host='localhost'):
         super().__init__(source, host)
-        self.current_date = datetime.now().date()
-        source_dir = os.path.splitext(source)[0]
+        self.current_date = datetime.now().date() # - timedelta(days=1)
+        source_dir = source[source.find('@')+1:source.find('/cam')]
         source_dir = os.path.basename(source_dir)
+
+        self.source_dir = source_dir
+
         self.output_dir = os.path.join('output', source_dir, str(self.current_date))
+        
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
+
         self.output_log = os.path.join(self.output_dir + '/log.txt')
         class _Track(Track):
             ALL = set()
@@ -178,8 +184,10 @@ class PersonAgent(Agent):
         self.w_par = Worker(lambda i, x: (i, par(_nd2file(x), self.api_calls)), debug=True)
         self.w_ext = Worker(lambda i, x: (i, ext(_nd2file(x), self.api_calls)))
         self.w_cmp = Worker(lambda i, x: (i, query(x, self.api_calls)))
+        #Worker containing the Record objects of overstayed objects
+        self.w_record = Worker(lambda x, i: (x, output(x, i)))
         # self.w_act = Worker(lambda i, x: (i, act(x, self.api_calls)))
-        self.workers.extend([self.w_ext, self.w_cmp, self.w_par,
+        self.workers.extend([self.w_ext, self.w_cmp, self.w_par, self.w_record
                              # self.w_act,
                              ])
         self.matches = {}
@@ -192,8 +200,27 @@ class PersonAgent(Agent):
     def on_new_det(self, t:Track, img_roi):
         self.w_ext.put(t, img_roi)
 
+    #Function to check current system date
+    def check_date(self):
+        if datetime.now().date() > self.current_date:
+            print('Creating new directory for {}'.format(datetime.now().date()))
+            
+            #Update date and create new directory
+            self.current_date = datetime.now().date()
+            new_dir = os.path.join(os.path.join('output', str(self.source_dir)), str(self.current_date))
+            os.makedirs(new_dir)
+
+            #Change output directory and output log file paths
+            self.output_dir = new_dir
+            self.output_log = new_dir + '/log.txt'
+
     def loop(self):
         while self.running:
+
+            #Check date every 600 frames
+            if self.frame_count % 600 == 0:
+                self.check_date()
+
             # sleep(0.1)
             if self.suspend == True:
                 sleep(0.5)
@@ -228,6 +255,9 @@ class PersonAgent(Agent):
                                 p.last_save = now
                             if p.id not in self.reported:
                                 self.reported.add(p.id)
+                                output_path = os.path.join(self.output_dir, '{}_{}_{}.avi'.format(p.id, '_'.join(t.par), datetime.now()))
+                                self.w_record.put(Record(output_path), frame_)
+
                                 p.example = self.crop(frame_, t.box)
                                 p.par = t.par
                                 p.color = t.color
@@ -250,6 +280,10 @@ class PersonAgent(Agent):
             #     x, y = self.control_queue.get()
             #     self.click_handle(frame_, x, y)
             self._render(frame)
+
+            #Perform post output procedure
+            self._post_output_procedure(frame)
+
             x_offset = 200
             for p in list(self.storage.id_map.values()):
                 if hasattr(p, 'example'):
@@ -331,6 +365,16 @@ class PersonAgent(Agent):
         if not self.w_par.p.empty():
             t, att = self.w_par.get()            # person attributes
             setattr(t, 'par', att)
+
+    #Function to perform post output procedure
+    def _post_output_procedure(self, frame):
+        if self.w_record.has_feedback():
+            current_record, _ = self.w_record.get()
+            #If True, save video
+            if current_record.check_save():
+                current_record.save_video()
+            else:
+                self.w_record.put(current_record, frame)
 
     # def _post_act_procedure(self):
     #     if not self.w_act.p.empty():
