@@ -135,6 +135,7 @@ class PersonAgent(Agent):
             os.makedirs(self.output_dir)
 
         self.output_log = os.path.join(self.output_dir + '/log.txt')
+
         class _Track(Track):
             ALL = set()
             current_id = 0
@@ -174,6 +175,11 @@ class PersonAgent(Agent):
                 return self.storage.query(feature)
             except AssertionError:
                 return {}
+
+        #Function to put frame into Record object and push to queue
+        def output(record, frame):
+            record.add_frame(frame)
+            return record, frame
 
         # def act(img_list, api_calls):
         #     api_calls['action'] += 1
