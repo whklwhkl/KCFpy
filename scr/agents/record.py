@@ -3,7 +3,7 @@ import cv2
 class Record:
 	def __init__(self, output_file):
 		self.hundred_frames = []
-		self.output_file = output_file + '.avi'
+		self.output_file = output_file
 
 	#Function that returns true if 100 frames are stored
 	def check_save(self):

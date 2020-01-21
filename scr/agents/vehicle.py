@@ -339,14 +339,15 @@ class VehicleAgent(Agent):
     
                         if hasattr(t, 'par'):
                             #Output into folder
-                            output_path = self.output_dir + '/' + str(i) + '_' + str(t.par[1][0]) + str(t.par[1][1])
+                            #output_path = self.output_dir + '/' + str(i) + '_' + str(t.par[1][0]) + str(t.par[1][1])
+                            output_path = os.path.join(self.output_dir, '{}_{}_{}'.format(i, '_'.join(t.par[1]), datetime.now()))
                             cv2.imwrite(output_path + '.jpg', _crop(frame_, t.box))
                             #End of output
 
                             if i not in self.reported:
                                 self.reported.add(i)
                                 print('[overstay] id:', i, '@', self.source)
-                                self.w_record.put(Record(output_path), frame_)
+                                self.w_record.put(Record(output_path + '.avi'), frame_)
 
 
                                 with open(self.output_log, 'a') as f:

@@ -31,23 +31,17 @@ if __name__ == '__main__':
     else:
         print('videos')
         main = Main([
-            # Agent('~/Videos/jp/L1-CP-F12_DRIVEWAY - 1280 x 720 - 10fps_20191220_155815.avi', opt, host),
-            # Agent('~/Videos/jp/L1-MB-PTZ1_LOADING BAYS - 1280 x 720 - 10fps_20191220_160054.avi', opt, host),
-            # Agent('~/Videos/jp/L1-MB-PTZ1_LOADING BAYS - 1280 x 720 - 10fps_20191220_170128.avi', opt, host),
-            # Agent('~/Videos/jp/L2-MB-D05-Cityroom 2 - 1280 x 720 - 10fps_20191218_130108.avi', opt, host),
+            #RTSP Stream
+            #VehicleAgent('rtsp://admin:Admin1234@192.168.66.40:554/cam/realmonitor?channel=1&subtype=0', opt, host),
+            #VehicleAgent('rtsp://admin:Admin1234@192.168.66.21:554/cam/realmonitor?channel=1&subtype=0', opt, host, scene = 1),
+            #PersonAgent('rtsp://admin:Admin1234@192.168.66.22:554/cam/realmonitor?channel=1&subtype=1', host),
+            #PersonAgent('rtsp://admin:Admin1234@192.168.66.69:554/cam/realmonitor?channel=1&subtype=1', host),
 
-            #VehicleAgent('/home/jeff/Desktop/capitaland_footage/L1-CP-F11_CARPARK BARRIER - 1280 x 720 - 10fps_20191218_080002.avi', opt, host),
+            #Demo videos
             VehicleAgent('~/Videos/jp/L1-REC-F03_DROP-OFF POINT - 1280 x 720 - 10fps_20191218_185810.avi', opt, host),
             VehicleAgent('~/Videos/jp/L1-CP-F11_CARPARK BARRIER - 1280 x 720 - 10fps_20191218_095417.avi', opt, host, scene = 1),
-            #PersonAgent('~/Videos/jp/L1-CP-F12_DRIVEWAY - 1280 x 720 - 10fps_20191220_155815.avi', host),
             PersonAgent('~/Videos/jp/L1-CP-F12_DRIVEWAY - 1280 x 720 - 10fps_20191220_155815.avi', host),
-            #PersonAgent('~/Videos/jp/L1-MB-PTZ1_LOADING BAYS - 1280 x 720 - 10fps_20191220_160054.avi', host),
             PersonAgent('~/Videos/jp/L1-MB-PTZ1_LOADING BAYS - 1280 x 720 - 10fps_20191220_160054.avi', host),
-            #VehicleAgent('/home/jeff/Desktop/capitaland_footage/L1-REC-F03_DROP-OFF POINT - 1280 x 720 - 10fps_20191218_194842.avi', opt, host),
-
-            # Agent('../../Videos/MOT16-02_1080p.mp4'),    # 01
-            #Agent('../../Videos/100.m4v'), #Agent('../../Videos/101.m4v'),    # CVPR19-02.mp4
-            #Agent('../../Videos/126.m4v'),    # 07
         ])
 
     main()
