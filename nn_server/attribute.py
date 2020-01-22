@@ -1,4 +1,3 @@
-from flask import Flask, request
 from torchvision.transforms import Compose, Resize, ToTensor, Normalize
 from torchvision.models.densenet import _DenseLayer
 from torch.nn import AvgPool2d

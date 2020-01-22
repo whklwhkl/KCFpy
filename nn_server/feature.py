@@ -4,14 +4,13 @@ from torchvision.transforms import Compose, Resize, ToTensor, Normalize
 
 class Feature:
     def __init__(self, model_path):
-        self.model = torch.jit.load(model_path).eval().cuda()
+        self.model = torch.jit.load(model_path).eval().half().cuda()
 
     async def __call__(self, img):
         img = await preprocess(img)
         with torch.no_grad():
-            fea = self.model(img[None].cuda())[0].cpu()
+            fea = self.model(img[None].half().cuda())[0].cpu()
         return fea.numpy().tolist()
-
 
 
 async def preprocess(img):

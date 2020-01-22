@@ -1,0 +1,9 @@
+version: "2.3"
+
+services:
+  human_recognition:
+    image: det_fea_att
+    container_name: human_det_fea_att
+    runtime: nvidia
+    ports:
+      - 6666:6666

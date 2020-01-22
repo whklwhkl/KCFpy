@@ -21,6 +21,7 @@ async def read_image(request):
 
 
 detector = Detector('half_h416_w416.pt', (416, 416), 0.85, 0.3)
+detector_bag = Detector('half_h416_w416_bag.pt', (416, 416), 0.85, 0.3)
 feature = Feature('r92m91.pt')
 attribute = Attribut('model.pth', .7)
 
@@ -30,6 +31,13 @@ async def det(request):
     img = await read_image(request)
     img = np.array(img)
     ret = await detector(img)
+    return web.json_response(ret)
+
+@routes.post('/det_bag')
+async def det(request):
+    img = await read_image(request)
+    img = np.array(img)
+    ret = await detector_bag(img)
     return web.json_response(ret)
 
 

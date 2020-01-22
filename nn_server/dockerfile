@@ -1,0 +1,13 @@
+FROM pytorch/pytorch:1.3-cuda10.1-cudnn7-runtime
+
+WORKDIR /app
+
+RUN pip install aiohttp dataclasses\
+    && pip install --no-cache torchvision==0.4.2 \
+    && conda install -y opencv
+
+COPY . /app
+
+EXPOSE 6666
+
+CMD python serving.py --port 6666
