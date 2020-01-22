@@ -34,3 +34,32 @@ class Worker:
     def suicide(self):
         self.running = False
         self.th.join(.5)
+
+
+class Consumer:
+    def __init__(self, func, debug=False):
+        self.q = Queue(maxsize=32)  # in
+        self.running = True
+        self.available = True
+
+        def loop():
+            while self.running:
+                try:
+                    i = self.q.get()
+                    self.available = False
+                    o = func(*i)
+                    self.available = True
+                except Exception as e:
+                    if debug:
+                        print(e)
+
+        self.th = Thread(target=loop)
+        self.th.start()
+
+    def put(self, *args):
+        if self.available:
+            self.q.put(args)
+
+    def suicide(self):
+        self.running = False
+        self.th.join()

@@ -1,22 +1,18 @@
 from .agent import *
 from .agent import _crop, _nd2file
+from .kcftracker import KCFTracker
 from .record import Record
+from .worker import Consumer
 from utils.action import cut, frames2data
 from time import time
 from datetime import datetime
 
-import pickle
-
 
 PAR = True
-ATTRIBUTES = ['Female', 'Front', 'Side', 'Back', 'Hat',
-              'Glasses', 'Hand Bag', 'Shoulder Bag', 'Backpack',
-              'Hold Objects in Front', 'Short Sleeve', 'Long Sleeve',
-              'Long Coat', 'Trousers', 'Skirt & Dress']
-SIMILARITY_THRESHOLD = .8
+DEBUG = False
+SIMILARITY_THRESHOLD = .85
 DISTANCE_THRESHOLD = 200
 FEATURE_MOMENTUM = .9
-TIMEWALL = 30
 IMAGE_LIST_SIZE = 10
 MIN_OVERSTAY = 120
 
@@ -36,10 +32,10 @@ def make_object_type():
             self.imgs = []  # video clips of action recognition for each person id
             cls.current_id += 1
 
-        def add_img(self, frame):
-            self.imgs.append(cut(frame, self.box))
-            if len(self.imgs) > IMAGE_LIST_SIZE:
-                self.imgs.pop(0)
+        # def add_img(self, frame):
+        #     self.imgs.append(cut(frame, self.box))
+        #     if len(self.imgs) > IMAGE_LIST_SIZE:
+        #         self.imgs.pop(0)
 
         def __str__(self):
             return self.id
@@ -57,6 +53,37 @@ def make_object_type():
             return delta > DISTANCE_THRESHOLD
 
     return Person
+
+
+def make_track_type():
+    from .async_kcftracker import update
+    class _Track(Track):
+        ALL = set()
+        current_id = 0
+        health = 5
+        CANDIDATE_IOU = .5
+
+        def step1(self, frame):
+            coro = update(self.tracker, frame)
+            try:
+                coro.send(None)
+            except StopIteration as e:
+                new_box = e.value
+            # new_box = self.tracker.update(frame)
+            new_box = np.array(new_box)
+            ds = new_box - self.box
+            ds_ = ds if self.velocity is None else self.velocity
+            self.velocity = ds * Track.momentum_ + ds_ * Track.momentum
+            self.box = new_box
+            H, W = frame.shape[:2]
+            l, t, h, w = self.box
+            if 0 < (l+w/2) < W and 0 < (t+h/2) < H:
+                pass
+            else:
+                self.visible = False
+
+    return _Track
+    # return _Track
 
 
 class Storage:
@@ -130,26 +157,21 @@ class PersonAgent(Agent):
         self.source_dir = source_dir
 
         self.output_dir = os.path.join('output', source_dir, str(self.current_date))
-        
+
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
         self.output_log = os.path.join(self.output_dir + '/log.txt')
 
-        class _Track(Track):
-            ALL = set()
-            current_id = 0
-            health = 2
-            CANDIDATE_IOU = .5
-
-        self.Track = _Track
+        self.Track = make_track_type()
         self.api_calls = {k: 0 for k in ['register',
                                          'detection',
                                          'feature',
                                          'query',
                                          'refresh',
                                          'attributes',
-                                         'action']}
+                                         # 'action',
+                                         ]}
         PAR_URL = 'http://%s:6666/att' % host
         EXT_URL = 'http://%s:6666/fea' % host
         # ACT_URL = 'http://%s:6671/act' % host
@@ -187,16 +209,16 @@ class PersonAgent(Agent):
         #     response = requests.post(ACT_URL, pickle.dumps(a))
         #     return response.json()[0]
 
-        self.w_par = Worker(lambda i, x: (i, par(_nd2file(x), self.api_calls)), debug=True)
+        self.w_par = Worker(lambda i, x: (i, par(_nd2file(x), self.api_calls)), debug=DEBUG)
         self.w_ext = Worker(lambda i, x: (i, ext(_nd2file(x), self.api_calls)))
         self.w_cmp = Worker(lambda i, x: (i, query(x, self.api_calls)))
         #Worker containing the Record objects of overstayed objects
         self.w_record = Worker(lambda x, i: (x, output(x, i)))
+        self.w_tracking = Consumer(lambda x: self.Track.step(x), debug=DEBUG)
         # self.w_act = Worker(lambda i, x: (i, act(x, self.api_calls)))
-        self.workers.extend([self.w_ext, self.w_cmp, self.w_par, self.w_record
-                             # self.w_act,
+        self.workers.extend([self.w_ext, self.w_cmp, self.w_par, self.w_record,
+                             self.w_tracking,
                              ])
-        self.matches = {}
         # memory
         self.reported = set()
 
@@ -210,7 +232,7 @@ class PersonAgent(Agent):
     def check_date(self):
         if datetime.now().date() > self.current_date:
             print('Creating new directory for {}'.format(datetime.now().date()))
-            
+
             #Update date and create new directory
             self.current_date = datetime.now().date()
             new_dir = os.path.join(os.path.join('output', str(self.source_dir)), str(self.current_date))
@@ -221,15 +243,14 @@ class PersonAgent(Agent):
             self.output_log = new_dir + '/log.txt'
 
     def loop(self):
+        track_list = None
         while self.running:
 
             #Check date every 600 frames
             if self.frame_count % 600 == 0:
                 self.check_date()
+                self.Track.ALL = set()
 
-            # sleep(0.1)
-            if self.suspend == True:
-                sleep(0.5)
             ret, frame = self.cap.read()
 
             if not ret or frame is None:
@@ -238,7 +259,9 @@ class PersonAgent(Agent):
                 continue
             # frame = cv2.resize(frame, (0, 0), fx=.5, fy=.5)  # down-sampling
             frame_ = frame.copy()
-            self.Track.step(frame_)
+            self.w_tracking.put(frame_)
+                # self.Track.step(frame_)
+
             if self.frame_count % INTEVAL == 0:
                 self.w_det.put(frame_)
                 self.storage.forget()
@@ -249,34 +272,29 @@ class PersonAgent(Agent):
                 if p is not None:
                     seconds = now - p.first_seen
                     t.stay = seconds
-                    p.add_img(frame_) # type Person
+                    t.par = getattr(p, 'attributes', [])
+                    # p.add_img(frame_) # type Person
                     # if len(p.imgs) >= IMAGE_LIST_SIZE and self.frame_count % TIMEWALL == 0:
                     #     self.w_act.put(p.id, p.imgs[-IMAGE_LIST_SIZE:])
+                    if getattr(p, 'not_register', True):
+                        self.w_par.put(p, _crop(frame_, t.box))
+                        p.not_register = False
                     if self.storage.object_type.is_overstay(seconds):
                         t.overstay = True
-                        if hasattr(t, 'par'):
-                            if now - p.last_save > 30:
-                                cv2.imwrite(os.path.join(self.output_dir, '{}_{}_{}.jpg'.format(p.id, '_'.join(t.par), datetime.now())),
-                                            self.crop(frame_, t.box))
-                                p.last_save = now
-                            if p.id not in self.reported:
-                                self.reported.add(p.id)
-                                output_path = os.path.join(self.output_dir, '{}_{}_{}.avi'.format(p.id, '_'.join(t.par), datetime.now()))
-                                self.w_record.put(Record(output_path), frame_)
+                        if p.id not in self.reported and hasattr(p, 'attributes'):
+                            self.reported.add(p.id)
+                            output_path = os.path.join(self.output_dir, '{}_{}_{}.%s'.format(p.id, '_'.join(p.attributes), datetime.now()))
+                            self.w_record.put(Record(output_path % 'avi'), frame_)
+                            p.example = self.crop(frame_, t.box)
+                            cv2.imwrite(output_path % 'jpg', p.example)
+                            p.color = t.color
+                                # logging = ' '.join(['[overstay] id:', p.id,
+                                #                     'attr:', ' '.join(p.attributes),
+                                #                     'loc:', self.source])
+                                # print(logging)
+                                # print(logging, file=open(self.output_log, 'a'))
 
-                                p.example = self.crop(frame_, t.box)
-                                p.par = t.par
-                                p.color = t.color
-                                print('[overstay] id:', p.id,
-                                      'attr:', ' '.join(t.par),
-                                      'loc:', self.source)
-                                print('[overstay] id:', p.id,
-                                      'attr:', ' '.join(t.par),
-                                      'loc:', self.source, file=open(self.output_log, 'a'))
-                        else:
-                            self.w_par.put(t, _crop(frame_, t.box))
                     p.last_seen = now
-                            # TODO: save alerts
             self._post_det_procedure()
             self._post_ext_procedure()
             self._post_cmp_procedure(frame_)
@@ -301,7 +319,7 @@ class PersonAgent(Agent):
                     cv2.putText(frame, p.id, (x_offset+w//2, h//2),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1.2, p.color, 2)
                     y_offset = 20
-                    for a in p.par:
+                    for a in p.attributes:
                         cv2.putText(frame, a, (x_offset, h + y_offset),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, p.color, 2)
                         y_offset += 20
@@ -321,6 +339,7 @@ class PersonAgent(Agent):
                 # memory bags in boxes2
                 # for b in boxes2:
                 #     self.bag_storage.reg(b)
+                del labels
                 self.Track.update(frame_, boxes)
                 for t in self.Track.ALL:
                     # t.visible=True
@@ -350,27 +369,15 @@ class PersonAgent(Agent):
             i = ret.get('id')
             if i is not None:
                 t.similarity = ret.get('similarity')
-                if t.similarity > SIMILARITY_THRESHOLD:
+                if self.storage.object_type.is_alike(t.similarity):
                     c = colors[hash(i or 0) % 256]
-                    # t.color = c
-                    # t.id = i
-                    # print(t.id, 'color', c)
-                    if i in self.matches:
-                        f = self.matches[i]
-                        if t > f:
-                            f.color = Track.color
-                            f.id = int(f.id)
-                            f.similarity = 0
-                            self.matches[i] = t
-                    else:
-                        self.matches[i] = t
-                    self.matches[i].color = c
-                    self.matches[i].id = i
+                    t.color = c
+                    t.id = i
 
     def _post_par_procedure(self):
         if not self.w_par.p.empty():
-            t, att = self.w_par.get()            # person attributes
-            setattr(t, 'par', att)
+            p, att = self.w_par.get()            # person attributes
+            p.attributes = att
 
     #Function to perform post output procedure
     def _post_output_procedure(self, frame):
@@ -390,7 +397,7 @@ class PersonAgent(Agent):
     #             # self.storage.id_map[i].action = ret[0]  # take the first action
 
     def _render(self, frame):
-        cv2.rectangle(frame, (0,0), (200, 225), (128,128,128), -1)
+        cv2.rectangle(frame, (0,0), (200, 175), (128,128,128), -1)
         cv2.putText(frame, 'Tracks:%d' % len(self.Track.ALL), (10, 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
         for i, kv in enumerate(self.api_calls.items()):
@@ -408,7 +415,7 @@ class PersonAgent(Agent):
         #     if trk.visible:
         #         trk._render(frame)  # tracks with matched ids
         for t in self.Track.ALL:
-            if t.visible and getattr(t, 'overstay', False):
+            if t.visible and getattr(t, 'overstay', False) or DEBUG:
                 t._render(frame)
                 x, y, w, h = map(int, t.box)
                 if hasattr(t, 'overstay'):
@@ -426,6 +433,7 @@ class PersonAgent(Agent):
                         y += 16
                         cv2.putText(frame, a, (x + w + 3, y),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, t.color, 2)
+
     @staticmethod
     def crop(frame, trk_box):
         H, W, _ = frame.shape

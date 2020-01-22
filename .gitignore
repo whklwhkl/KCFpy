@@ -19,3 +19,5 @@
 *.dat
 *.png
 *.exe
+*.tar.gz
+*.dockerignore
