@@ -7,10 +7,10 @@ from skimage.measure import compare_ssim
 class Vehicle_Detector():
 	def __init__(self, opt, scene = 0):
 
-		#If carpark scene
-		if scene != 0:
-			self.max_area = 6000
-		#If normal scene
+		#If carpark barrier scene
+		if scene == 1:
+			self.max_area = 8000
+		#If pickup point
 		else:
 			self.max_area = 3500
 
@@ -112,17 +112,20 @@ class Vehicle_Detector():
 		for item in detections:
 			coordinates = item[:4].type(torch.int).tolist()
 
+			#Filter zeroes
 			if coordinates[0] <= 0 or coordinates[1] <= 0 or coordinates[2] <= 0 or coordinates[3] <= 0: continue
 
 			width = coordinates[2] - coordinates[0]
 			height = coordinates[3] - coordinates[1]
 			area = width * height
 
-			#Check x2
-			if coordinates[2] <= 1220 and coordinates[3] >= 215 and area >= self.max_area:
+			#Filter condition for barrier scene
+			if self.scene == 1 and area >= self.max_area:
 				bbox_list.append(coordinates)
-			elif self.scene == 1 and area >= self.max_area:
+			#Filter condition for pickup point scene
+			elif coordinates[2] <= 1220 and coordinates[3] >= 215 and area >= self.max_area:
 				bbox_list.append(coordinates)
+
 
 		return bbox_list
 

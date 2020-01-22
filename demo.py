@@ -17,6 +17,9 @@ if __name__ == '__main__':
     parser.add_argument('--half', action='store_true', help='half precision FP16 inference')
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
 
+    #Debug mode, shows track boxes and worker errors
+    parser.add_argument('--debug', action='store_true', help='Whether to launch debug mode')
+
     opt = parser.parse_args()
 
     host = 'localhost'
@@ -39,7 +42,7 @@ if __name__ == '__main__':
 
             #Demo videos
             VehicleAgent('~/Videos/jp/L1-REC-F03_DROP-OFF POINT - 1280 x 720 - 10fps_20191218_185810.avi', opt, host),
-            VehicleAgent('~/Videos/jp/L1-CP-F11_CARPARK BARRIER - 1280 x 720 - 10fps_20191218_095417.avi', opt, host, scene = 1),
+            VehicleAgent('/home/jeff/Videos/cut_test.m4v', opt, host, scene = 1),
             PersonAgent('~/Videos/jp/L1-CP-F12_DRIVEWAY - 1280 x 720 - 10fps_20191220_155815.avi', host),
             PersonAgent('~/Videos/jp/L1-MB-PTZ1_LOADING BAYS - 1280 x 720 - 10fps_20191220_160054.avi', host),
         ])

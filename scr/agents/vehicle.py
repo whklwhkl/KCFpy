@@ -23,6 +23,10 @@ COSINE_LOWER_THRESH = 0.85
 #Feature Smoothing Parameter
 FEATURE_MOMENTUM = 1
 
+#Overstay Threshold
+CARPARK_BARRIER_THRESH = 60
+PICKUP_POINT_THRESH = 180
+
 def make_object_type(overstay):
     class Vehicle:
 
@@ -158,6 +162,9 @@ class VehicleAgent(Agent):
     def __init__(self, source, detector_opt, host='localhost', scene = 0):
         super().__init__(source, host)
 
+        #Debug mode
+        self.debug = detector_opt.debug
+
         #Current date
         self.current_date = datetime.now().date() # - timedelta(days=1)
 
@@ -185,11 +192,11 @@ class VehicleAgent(Agent):
                                          'counts']}
         #If drop off point
         if scene == 0:                              
-            self.storage = Storage(make_object_type(180))
+            self.storage = Storage(make_object_type(PICKUP_POINT_THRESH))
             #self.OVERSTAY_THRESH = 180
         #If carpark
         else:
-            self.storage = Storage(make_object_type(60))
+            self.storage = Storage(make_object_type(CARPARK_BARRIER_THRESH))
             #self.OVERSTAY_THRESH = 60
 
         from .vehicle_agent.vehicle_detector import Vehicle_Detector
@@ -242,21 +249,18 @@ class VehicleAgent(Agent):
             return record, frame
 
         #Worker for detetion
-        self.w_det = Worker(lambda x : (x, det(x)), debug = True)
+        self.w_det = Worker(lambda x : (x, det(x)), debug = detector_opt.debug)
         
-        self.w_var = Worker(lambda i, x: (i, var(i, x)), debug = True)
+        self.w_var = Worker(lambda i, x: (i, var(i, x)), debug = detector_opt.debug)
 
         #Takes in Tracker Object and cropped image in process queue
-        self.w_ext = Worker(lambda i, x : (i, ext(x)))
+        self.w_ext = Worker(lambda i, x : (i, ext(x)), debug = detector_opt.debug)
 
         #Takes in Tracker Object and Extracted features
-        self.w_cmp = Worker(lambda i, x: (i, query(x)))
+        self.w_cmp = Worker(lambda i, x: (i, query(x)), debug = detector_opt.debug)
 
         #Worker containing the Record objects of overstayed objects
-        self.w_record = Worker(lambda x, i: (x, output(x, i)))
-
-        #Worker for Vehicle Attributes, takes in tracker object and cropped image
-        #self.w_par = Worker(lambda i, x : (i, var(x)))
+        self.w_record = Worker(lambda x, i: (x, output(x, i)), debug = detector_opt.debug)
 
         self.workers = [self.w_det, self.w_ext, self.w_cmp, self.w_var, self.w_record]
 
@@ -471,6 +475,10 @@ class VehicleAgent(Agent):
     def _render(self, frame):
         #super()._render(frame)
         for t in self.Track.ALL:
+            #Debugging mode, show track boxes
+            if self.debug:
+                t._render(frame)
+
             x, y, w, h = map(int, t.box)
             r = x + w
             b = y + h
@@ -492,7 +500,6 @@ class VehicleAgent(Agent):
                 #Show only overstay
                 if self.storage.object_type.is_overstay(t.stay):
                     cv2.rectangle(frame, (x, y), (r, b), t.color, 2)
-                #End
 
                     if t.visible:
                         if hasattr(t, 'stay'):

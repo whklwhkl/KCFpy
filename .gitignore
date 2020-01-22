@@ -2,6 +2,7 @@
 /__pycache__
 /output
 /models
+/assets
 
 #Files
 *.pyc
