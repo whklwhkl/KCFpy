@@ -81,6 +81,7 @@ class Storage:
         p = self.object_type(feature, box)
         self.id_map[p.id] = p
 
+    #Original Register method
     def reg(self, feature, box):
         feature = np.array(feature, np.float32)
 
@@ -104,12 +105,15 @@ class Storage:
             #Register new vehicle if lower than thresh
             elif q['similarity'] < COSINE_LOWER_THRESH:
                 self.add(feature, box)
+                #print('Register')
+                
             #Possible occlusion or too many similar vehicles in Storage
             else:
                 pass
 
         #First case, if storage is empty add new vehicle
         else:
+            #print('First Register')
             self.add(feature, box)
 
     def query(self, feature):
@@ -207,7 +211,7 @@ class VehicleAgent(Agent):
         #Initialise Detector Model
         #Increase conf_thresh if not carpark barrier scene
         if scene != 0:
-            detector_opt.conf_thres = 0.7
+            detector_opt.conf_thres = 0.3
 
         self.vehicle_detector = Vehicle_Detector(detector_opt, scene)
 
@@ -355,7 +359,7 @@ class VehicleAgent(Agent):
                                     f.write(message)
                                 
             #Perform post detection (KCF tracker) procedures and push to w_ext
-            self._post_det_procedure()
+            self._post_det_procedure(frame)
 
             #Perform post feature extraction, push to w_cmp queue for feature comparison and register in storage
             self._post_ext_procedure()
@@ -391,7 +395,7 @@ class VehicleAgent(Agent):
         return boxes[:, :4]
 
     #Function to perform post detection procedure
-    def _post_det_procedure(self):
+    def _post_det_procedure(self, frame = None):
         #If worker queue is not empty
         if self.w_det.has_feedback():
             frame_, boxes = self.w_det.get()
@@ -401,6 +405,9 @@ class VehicleAgent(Agent):
             if boxes is not None and boxes != []:
                 #boxes = _cvt_ltrb2ltwh(boxes)
                 boxes = self.convert(boxes)
+
+                #self.plot_det_boxes(boxes, frame)
+
                 self.Track.update(frame_, boxes)
 
                 for t in self.Track.ALL:
@@ -425,8 +432,13 @@ class VehicleAgent(Agent):
             #print(feature[0])
             t.feature = feature[0]
             self.w_cmp.put(t, feature[0])
-            self.storage.reg(feature[0], t.box)
-            self.api_calls['register'] += 1
+
+            #print(t.velocity)
+
+            #Introduce velocity filter
+            if abs(t.velocity[0]) < 0.1 and abs(t.velocity[1]) < 0.1:
+                self.storage.reg(feature[0], t.box)
+                self.api_calls['register'] += 1
 
     #Function perform feature similarity comparison
     def _post_cmp_procedure(self, frame_):
@@ -509,3 +521,8 @@ class VehicleAgent(Agent):
                                                 cv2.FONT_HERSHEY_SIMPLEX, 1., t.color, 2)
 
         return frame
+
+    #Plot det boxes
+    def plot_det_boxes(self, boxes, frame):
+        for box in boxes:
+            cv2.rectangle(frame, (box[0], box[1]), (box[0] + box[2], box[1] + box[3]), (255,0,0), 2)

@@ -6,7 +6,7 @@ from math import sqrt, ceil
 
 
 class Main:
-    def __init__(self, agents):
+    def __init__(self, agents, record = False):
 
         def escape():
             for a in agents:
@@ -31,6 +31,14 @@ class Main:
         self.x0 = [i % clms * self.panel_size[0] for i in range(n)]
         self.x1 = [i + self.panel_size[0] for i in self.x0]
         self.box = list(zip(self.y0, self.y1, self.x0, self.x1))
+
+        #Video Recorder
+        if record:
+            self.recorder = cv2.VideoWriter('./output.avi', cv2.VideoWriter_fourcc(*'XVID'), 30.0, (1920, 1080))
+
+        self.record = record
+        self.frame_count = 0
+
         def foo(event, x, y, flags, param):
             if event == cv2.EVENT_LBUTTONDOWN:
                 for i, (y0, y1, x0, x1) in enumerate(self.box):
@@ -67,12 +75,23 @@ class Main:
     def __call__(self):
 
         while True:
+            self.frame_count += 1
             for i, a in enumerate(self.agents):
                 if not a.display_queue.empty():
                     img = a.display_queue.get()
                     img = cv2.resize(img, self.panel_size)
                     y0, y1, x0, x1 = self.box[i]
                     self.canvas[y0:y1, x0:x1] = img
+
+                    #Added for video recording
+                    if self.record:
+                        if self.frame_count >= 0 and self.frame_count <= 2000:
+                            self.recorder.write(self.canvas)
+                        else:
+                            self.recorder.release()
+                            self.record = False
+                            print('Video saved.')
+
                     cv2.imshow(self.name, self.canvas)
                     if cv2.waitKey(1) == 27:
                         for a in self.agents:

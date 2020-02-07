@@ -19,6 +19,7 @@ if __name__ == '__main__':
 
     #Debug mode, shows track boxes and worker errors
     parser.add_argument('--debug', action='store_true', help='Whether to launch debug mode')
+    parser.add_argument('--record', action='store_true', help='Whether to record video (1st 5 mins)')
 
     opt = parser.parse_args()
 
@@ -43,8 +44,9 @@ if __name__ == '__main__':
             #Demo videos
             VehicleAgent('~/Videos/jp/L1-REC-F03_DROP-OFF POINT - 1280 x 720 - 10fps_20191218_185810.avi', opt, host),
             VehicleAgent('/home/jeff/Videos/cut_test.m4v', opt, host, scene = 1),
+            #PersonAgent('~/Videos/jp/L1-CP-F12_DRIVEWAY - 1280 x 720 - 10fps_20191220_155815.avi', host),
             PersonAgent('~/Videos/jp/L1-CP-F12_DRIVEWAY - 1280 x 720 - 10fps_20191220_155815.avi', host),
             PersonAgent('~/Videos/jp/L1-MB-PTZ1_LOADING BAYS - 1280 x 720 - 10fps_20191220_160054.avi', host),
-        ])
+        ], record = opt.record)
 
     main()

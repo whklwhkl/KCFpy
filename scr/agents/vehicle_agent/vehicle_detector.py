@@ -32,7 +32,7 @@ class Vehicle_Detector():
 		# Get classes and colors
 		self.classes = load_classes(parse_data_cfg(opt.data)['names'])
 
-		if self.opt.conf_thres == 0.7:
+		if self.opt.conf_thres == 0.3:
 			self.scene = 1
 		else:
 			self.scene = 0
