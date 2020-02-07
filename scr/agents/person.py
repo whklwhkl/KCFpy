@@ -316,7 +316,7 @@ class PersonAgent(Agent):
                     x_offset_ = x_offset + w
                     frame[0:h, x_offset:x_offset_] = example
                     cv2.rectangle(frame, (x_offset, 0), (x_offset_, h), p.color, 1)
-                    cv2.putText(frame, p.id, (x_offset+w//2, h//2),
+                    cv2.putText(frame, p.id, (x_offset, h//2),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1.2, p.color, 2)
                     y_offset = 20
                     for a in p.attributes:

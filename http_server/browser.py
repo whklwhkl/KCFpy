@@ -11,8 +11,8 @@ def main():
     print('[ctrl + c] to stop')
     OUTPUT_DIR = '../output'
     while 1:
-        with HTML_Table_writer('index.html', 'logs') as w:
-            w.add('idx', 'name', header=True)
+        with HTML_Diagram_writer('index.html', 'logs') as w:
+            # w.add('idx', 'name', header=True)
             for i, d in enumerate(os.listdir(OUTPUT_DIR)):
                 # 192.168.66.69_554
                 at = os.path.join(OUTPUT_DIR, d)
@@ -21,9 +21,13 @@ def main():
                 if not os.path.exists(dl):
                     os.mkdir(dl)
                 ht = '{}.html'.format(dl)
-                w.add(str(i), w.link(d, ht))
-                with HTML_Table_writer(ht, at) as ww:
-                    ww.add('date', header=True)
+                # w.add(str(i), w.link(d, ht))
+                w.link(d, ht)
+                with HTML_Diagram_writer(ht, at,
+                                         height=1000,
+                                         type='BarChart',
+                                         element='Date') as ww:
+                    # ww.add('date', header=True)
                     for dd in os.listdir(at):
                         # 2020-01-19
                         att = os.path.join(at, dd)
@@ -32,7 +36,8 @@ def main():
                         if not os.path.exists(ddl):
                             os.mkdir(ddl)
                         htt = '{}.html'.format(ddl)
-                        ww.add(ww.link(dd, htt))
+                        ww.link(dd, htt)
+                        # ww.add(ww.link(dd, htt))
                         with HTML_Table_writer(htt, att) as www:
                             www.add('index', 'attributes', 'time', 'video', header=True)
                             for ddd in os.listdir(att):
@@ -46,6 +51,8 @@ def main():
                                 # the rest is attributes
                                 attt = os.path.join(att, ddd)
                                 dddl = os.path.join('assets', '{}.mp4'.format(abs(hash(ddd))))
+                                w.add(d)
+                                ww.add(dd)
                                 if not os.path.exists(dddl):
                                     # os.symlink(attt, dddl)
                                     os.system('ffmpeg -i "{}" "{}"'.format(attt, dddl))
@@ -105,6 +112,83 @@ class HTML_Table_writer:
     @staticmethod
     def link(name, url):
         return '<a href="{}">{}</a>'.format(url, name)
+
+
+class HTML_Diagram_writer:
+    def __init__(self, path, title, width=800, height=600, type='PieChart', element='Location'):
+        self.name = path
+        self.title = title
+        self.width = width
+        self.height = height
+        self.type = type
+        self.element = element
+        self.file = open(path, 'w')
+        self.data = {}
+        self.url = {}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        title = self.field('title', self.title)
+        script = self.field('script', '', type='text/javascript',
+                            src='https://www.gstatic.com/charts/loader.js')
+        jscode = "google.charts.load('current', {'packages':['corechart']});"
+        jscode += "google.charts.setOnLoadCallback(drawChart);"
+        data = [list(x) for x in self.data.items()]
+        data.sort(key=lambda x:-x[1])
+        drawChart = '''
+function drawChart() {{
+    var data = new google.visualization.DataTable();
+    data.addColumn('string', '{}');
+    data.addColumn('number', 'Counts');
+    data.addRows({});
+    var options = {{'title':'{}',
+                   'width':{},
+                   'height':{}}};
+    var chart = new google.visualization.{}(document.getElementById('chart_div'));
+    var links = {};
+    function selectHandler() {{
+      var selectedItem = chart.getSelection()[0];
+      if (selectedItem) {{
+        var topping = data.getValue(selectedItem.row, 0);
+        window.location.href = './' + links[topping];
+      }}
+    }}
+    google.visualization.events.addListener(chart, 'select', selectHandler);
+    chart.draw(data, options);
+}}
+        '''.format(self.element, str(data), self.title, self.width, self.height, self.type, str(self.url))
+        jscode += drawChart
+        # TODO: data and link
+        script += self.field('script', jscode, type='text/javascript')
+        head = self.field('head', title + script)
+        div = self.field('div', '',
+                         id='chart_div',
+                         style='width:{}; height:{}'.format(self.width,
+                                                            self.height))
+        body = self.field('body', div)
+        html = self.field('html', head + body)
+        self.file.write(html)
+        self.file.close()
+
+    def add(self, name):
+        try:
+            self.data[name] += 1
+        except KeyError:
+            self.data[name] = 1
+
+    def link(self, name, url):
+        self.url[name] = url
+
+    @staticmethod
+    def field(name, content, **kwargs):
+        if len(kwargs):
+            start = '<{}>'.format(' '.join([name] + ['{}="{}"'.format(k, v) for k,v in kwargs.items()]))
+        else:
+            start = '<{}>'.format(name)
+        end = '</{}>'.format(name)
+        return start + content + end
 
 
 if __name__ == '__main__':
