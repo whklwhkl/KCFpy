@@ -45,6 +45,8 @@ class Main:
                     if x0<=x<x1 and y0<=y<y1:
                         # TODO: play a video clip for 10 seconds
                         print('cam {}: x {}, y {}'.format(i, x-x0, y-y0))
+                        self.agents[i].control_queue.put(((x-x0)/(x1-x0),
+                                                          (y-y0)/(y1-y0)))
         cv2.setMouseCallback(self.name, foo)
 
         def _reset():

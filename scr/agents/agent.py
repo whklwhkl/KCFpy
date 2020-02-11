@@ -94,6 +94,8 @@ class Agent:
         self.running = True
         self.suspend = False
         self.on_det_funcs = []
+        self.contour = None
+        self.points = []
         #self.th = Thread(target=self.loop, daemon=True)
         #self.th.start()
 
@@ -119,7 +121,7 @@ class Agent:
             self._post_det_procedure()
             if not self.control_queue.empty():
                 x, y = self.control_queue.get()
-                self.click_handle(frame_, x, y)
+                self.click_handle(x, y)
             self._render(frame)
             # print(self.display_queue.qsize())
             # print(self.w_cmp.p.qsize(), self.w_cmp.q.qsize())
@@ -137,24 +139,21 @@ class Agent:
         self.running = False
         self.th.join(.1)
 
-    def click_handle(self, frame, x, y):
-        H, W, _ = frame.shape
-        x *= W
-        y *= H
+    def click_handle(self, x, y):
         # print(x, y, 'agent', self.source)
-        for trk in self.Track.ALL:
-            l, t, w, h = trk.box
-            if l < x < l + w and t < y < t + h:
-                def work():
-                    img_roi = _crop(frame, trk.box)
-                    trk.feature = self.ext(_nd2file(img_roi), self.api_calls)
-                    self.up(str(trk.id), trk.feature, self.api_calls)
-                    self.q_reg.put(1)
-
-                th = Thread(target=work)
-                th.start()
-                th.join()
-                break   # only match once
+        if self.contour is None:
+            self.points.append((x,y))
+        elif cv2.pointPolygonTest(self.contour, (x, y), False) > 0:
+            self.contour = None
+            self.points = []
+        else:
+            self.points.append((x,y))
+        if len(self.points) > 2:
+            points = np.array(self.points)
+            mean = np.mean(points, 0, keepdims=True)
+            theta = [np.angle(complex(*x)) for x in points - mean]
+            points = points[np.argsort(theta)]
+            self.contour = points
 
     def _post_det_procedure(self):
         if self.w_det.has_feedback():

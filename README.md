@@ -22,6 +22,12 @@ If we do not have the services ready, we can launch them on the local host.
 
 `python demo.py` launch client demo
 
+# setting up Region of Interests
+To keep those detection results of no interest from showing up, we can set up a RoI area for each camera by `LEFT CLICK`
+- click on the panel: add a vertex to the RoI polygon
+- if the number of vertex is enough to determine a polygon, the polygon is drawn
+- to delete an existing RoI area, just click within
+
 # Collect tracked objects from Videos
 
 ```bash

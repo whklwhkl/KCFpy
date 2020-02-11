@@ -300,9 +300,10 @@ class PersonAgent(Agent):
             self._post_cmp_procedure(frame_)
             # self._post_act_procedure()
             self._post_par_procedure()
-            # if not self.control_queue.empty():
-            #     x, y = self.control_queue.get()
-            #     self.click_handle(frame_, x, y)
+            if not self.control_queue.empty():
+                x, y = self.control_queue.get()
+                H, W, _ = frame.shape
+                self.click_handle(int(x * W), int(y * H))
             self._render(frame)
 
             #Perform post output procedure
@@ -397,6 +398,15 @@ class PersonAgent(Agent):
     #             # self.storage.id_map[i].action = ret[0]  # take the first action
 
     def _render(self, frame):
+        if len(self.points):
+            for p in self.points:
+                cv2.drawMarker(frame, p, (255, 0, 255))
+        if self.contour is not None:
+            frame_ = frame.copy()
+            cv2.drawContours(frame_, [self.contour], 0, (0, 255, 0), thickness=-1)
+            opacity = .7
+            cv2.addWeighted(frame_, 1 - opacity, frame, opacity, 0., frame)
+
         cv2.rectangle(frame, (0,0), (200, 175), (128,128,128), -1)
         cv2.putText(frame, 'Tracks:%d' % len(self.Track.ALL), (10, 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
@@ -446,13 +456,29 @@ class PersonAgent(Agent):
         return crop
 
 
-def _cvt_ltrb2ltwh(boxes):
+def _cvt_ltrb2ltwh(boxes, contour=None):
     boxes_ = []
     labels = []
-    for b in boxes:
-        labels.append(b['label'])
-        b = b['box']
-        boxes_.append([b['left'], b['top'], b['right'], b['bottom']])
+    if contour is None:
+        for b in boxes:
+            labels.append(b['label'])
+            b = b['box']
+            boxes_.append([b['left'], b['top'], b['right'], b['bottom']])
+    else:
+        for b in boxes:
+            l = b['labels']
+            b = b['box']
+            left = b['left']
+            top = b['top']
+            right = b['right']
+            bottom = b['bottom']
+            point = ((left+right)/2, bottom)
+            if cv2.pointPolygonTest(contour, point, False) > 0:
+                # -1:out, 1: in, 0:on
+                labels.append(l)
+                boxes_.append([left, top, right, bottom])
+            else:
+                print('excluded', b)
     boxes = np.array(boxes_)
     boxes[:, 2: 4] -= boxes[:, :2]
     return boxes[:, :4], labels
