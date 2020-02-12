@@ -147,8 +147,7 @@ class Storage:
         # return np.exp(cos - 1)
 
 class PersonAgent(Agent):
-
-    def __init__(self, source, host='localhost'):
+    def __init__(self, source, host='localhost', debug = False):
         super().__init__(source, host)
         self.current_date = datetime.now().date() # - timedelta(days=1)
         source_dir = source[source.find('@')+1:source.find('/cam')]
@@ -162,6 +161,9 @@ class PersonAgent(Agent):
             os.makedirs(self.output_dir)
 
         self.output_log = os.path.join(self.output_dir + '/log.txt')
+
+        #Added for debug
+        self.debug = debug
 
         self.Track = make_track_type()
         self.api_calls = {k: 0 for k in ['register',
@@ -309,13 +311,15 @@ class PersonAgent(Agent):
             #Perform post output procedure
             self._post_output_procedure(frame)
 
-            x_offset = 200
+            x_offset = 0
+
             for p in list(self.storage.id_map.values()):
                 if hasattr(p, 'example'):
                     example = p.example
                     h, w, _ = example.shape
                     x_offset_ = x_offset + w
                     frame[0:h, x_offset:x_offset_] = example
+                    frame = cv2.resize(frame, (128,128))
                     cv2.rectangle(frame, (x_offset, 0), (x_offset_, h), p.color, 1)
                     cv2.putText(frame, p.id, (x_offset, h//2),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1.2, p.color, 2)
@@ -401,20 +405,23 @@ class PersonAgent(Agent):
         if len(self.points):
             for p in self.points:
                 cv2.drawMarker(frame, p, (255, 0, 255))
+
         if self.contour is not None:
             frame_ = frame.copy()
             cv2.drawContours(frame_, [self.contour], 0, (0, 255, 0), thickness=-1)
             opacity = .7
             cv2.addWeighted(frame_, 1 - opacity, frame, opacity, 0., frame)
 
-        cv2.rectangle(frame, (0,0), (200, 175), (128,128,128), -1)
-        cv2.putText(frame, 'Tracks:%d' % len(self.Track.ALL), (10, 20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
-        for i, kv in enumerate(self.api_calls.items()):
-            cv2.putText(frame, '{:<10}'.format(kv[0]), (10, i*20 + 60),
-                        cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 0), 1)
-            cv2.putText(frame, '{:>6}'.format(kv[1]), (100, i*20 + 60),
-                        cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 0), 1)
+        #Display grey box only for debugging mode
+        if self.debug:
+            cv2.rectangle(frame, (0,0), (200, 175), (128,128,128), -1)
+            cv2.putText(frame, 'Tracks:%d' % len(self.Track.ALL), (10, 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+            for i, kv in enumerate(self.api_calls.items()):
+                cv2.putText(frame, '{:<10}'.format(kv[0]), (10, i*20 + 60),
+                            cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 0), 1)
+                cv2.putText(frame, '{:>6}'.format(kv[1]), (100, i*20 + 60),
+                            cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 0), 1)
         # trk_lst = []
         # for trk in cls.ALL:
         #     if isinstance(trk.id, str):
@@ -424,6 +431,7 @@ class PersonAgent(Agent):
         # for trk in trk_lst:
         #     if trk.visible:
         #         trk._render(frame)  # tracks with matched ids
+        
         for t in self.Track.ALL:
             if t.visible and getattr(t, 'overstay', False) or DEBUG:
                 t._render(frame)
