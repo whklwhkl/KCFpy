@@ -318,6 +318,10 @@ class PersonAgent(Agent):
                     example = p.example
                     h, w, _ = example.shape
                     x_offset_ = x_offset + w
+
+                    if x_offset_ >= 1280:
+                        break
+
                     frame[0:h, x_offset:x_offset_] = example
                     frame = cv2.resize(frame, (128,128))
                     cv2.rectangle(frame, (x_offset, 0), (x_offset_, h), p.color, 1)
